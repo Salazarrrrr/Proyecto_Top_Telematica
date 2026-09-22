@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package dfsha;
+
+
+// Aqui se define el servicio gRPC encargado de las operaciones sobre bloques, la logoca pero no se si esta buena
+
+service BloqueServicio {
+
+    rpc EscribirBloque(EscribirBloqueRequest) returns (EscribirBloqueResponse);
+
+    rpc LeerBloque(LeerBloqueRequest) returns (LeerBloqueResponse);
+
+    rpc EliminarBloque(EliminarBloqueRequest) returns (EliminarBloqueResponse);
+}
+
+
+// Define los datos que deben enviarse para escribir un bloque.
+message EscribirBloqueRequest {
+
+    string block_id = 1;
+
+    // Identificador del archivo al que pertenece el bloque.
+    string file_id = 2;
+
+    // Posición que ocupa el bloque dentro del archivo original.
+    int32 posicion = 3;
+
+    // bytes permite transportar directamente los datos del archivo.
+    bytes contenido = 4;
+
+    // Valor utilizado para verificar la integridad del bloque.
+    string checksum = 5;
+}
+
+
+// Aqui se define la información que devuelve el servicio,  después de intentar escribir un bloque.
+message EscribirBloqueResponse {
+
+    // Indica si la operación de escritura fue exitosa, true correcto y false que fallo 
+    bool exito = 1;
+
+    // Mensaje descriptivo sobre el resultado de la operación.
+    string mensaje = 2;
+
+    // Identificador del bloque relacionado con la operación.
+    string block_id = 3;
+}
+
+
+// Define los datos necesarios para solicitar la lectura de un bloque.
+message LeerBloqueRequest {
+
+    // Identificador del bloque que se desea recuperar.
+    string block_id = 1;
+}
+
+
+// Define la información que devuelve el servicio después de intentar leer un bloque.
+message LeerBloqueResponse {
+
+    // Indica si la operación de lectura fue exitosa.
+    bool exito = 1;
+
+    // Mensaje descriptivo sobre el resultado de la operación.
+    string mensaje = 2;
+
+    // Identificador del bloque recuperado.
+    string block_id = 3;
+
+    // Identificador del archivo al que pertenece el bloque.
+    string file_id = 4;
+
+    // Posición del bloque dentro del archivo original.
+    int32 posicion = 5;
+
+    // Contenido binario del bloque recuperado.
+    bytes contenido = 6;
+
+    // Checksum utilizado para verificar la integridad del bloque recuperado.
+    string checksum = 7;
+}
+
+
+// Aqui es para pedir ñps datos para la eliminación de un bloque.
+message EliminarBloqueRequest {
+
+    // Identificador del bloque que se va a eliminar.
+    string block_id = 1;
+}
+
+
+// Define la información que devuelve el servicio después de intentar eliminar un bloque.
+message EliminarBloqueResponse {
+
+    // Indica si la eliminación fue exitosa.
+    bool exito = 1;
+
+    // Mensaje descriptivo sobre el resultado de la operación.
+    string mensaje = 2;
+}
