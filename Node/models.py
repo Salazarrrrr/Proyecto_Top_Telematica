@@ -11,3 +11,4 @@ class Bloque:
     posicion: int
     contenido: bytes
     checksum: str
+

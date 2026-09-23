@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 package dfsha;
+option java_package = "dfsha"
+option java_multiple_file = true;
 
 
 // Aqui se define el servicio gRPC encargado de las operaciones sobre bloques, la logoca pero no se si esta buena
