@@ -1,0 +1,5 @@
+Flask>=3.1,<4
+grpcio>=1.84,<2
+grpcio-tools>=1.84,<2
+protobuf>=7.35.1,<8
+cryptography>=44,<48

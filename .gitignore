@@ -1,1 +1,10 @@
 .http-forge/
+Deploy/.env
+Deploy/certs/*
+!Deploy/certs/.gitignore
+__pycache__/
+*.py[cod]
+.pytest_cache/
+metadata/
+almacenamiento_bloques/
+Cluster/target/

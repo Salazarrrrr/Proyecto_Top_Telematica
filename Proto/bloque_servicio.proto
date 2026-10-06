@@ -1,8 +1,8 @@
 syntax = "proto3";
 
 package dfsha;
-option java_package = "dfsha"
-option java_multiple_file = true;
+option java_package = "dfsha";
+option java_multiple_files = true;
 
 
 // Aqui se define el servicio gRPC encargado de las operaciones sobre bloques, la logoca pero no se si esta buena
@@ -14,6 +14,43 @@ service BloqueServicio {
     rpc LeerBloque(LeerBloqueRequest) returns (LeerBloqueResponse);
 
     rpc EliminarBloque(EliminarBloqueRequest) returns (EliminarBloqueResponse);
+
+    // Heartbeat de aplicación para identidad, disponibilidad y capacidad local.
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+    // Difunde la vista de membresía vigente a todos los nodos alcanzables.
+    rpc ActualizarMembresia(ActualizarMembresiaRequest) returns (ActualizarMembresiaResponse);
+}
+
+message HeartbeatRequest {
+    string requester_id = 1;
+}
+
+message HeartbeatResponse {
+    bool exito = 1;
+    string node_id = 2;
+    string estado = 3;
+    int64 last_heartbeat_unix_ms = 4;
+    int64 capacidad_disponible_bytes = 5;
+}
+
+message NodoMembresia {
+    string node_id = 1;
+    string direccion = 2;
+    int32 puerto = 3;
+    string estado = 4;
+    string hash_position = 5;
+    string last_heartbeat = 6;
+    int64 capacidad_disponible_bytes = 7;
+}
+
+message ActualizarMembresiaRequest {
+    repeated NodoMembresia nodos = 1;
+}
+
+message ActualizarMembresiaResponse {
+    bool exito = 1;
+    uint32 miembros = 2;
 }
 
 

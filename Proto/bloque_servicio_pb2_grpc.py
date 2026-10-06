@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from Proto import bloque_servicio_pb2 as bloque__servicio__pb2
+from Proto import bloque_servicio_pb2 as Proto_dot_bloque__servicio__pb2
 
 GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in bloque_servicio_pb2_grpc.py depends on'
+        + ' but the generated code in Proto/bloque_servicio_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -38,18 +38,28 @@ class BloqueServicioStub:
         """
         self.EscribirBloque = channel.unary_unary(
                 '/dfsha.BloqueServicio/EscribirBloque',
-                request_serializer=bloque__servicio__pb2.EscribirBloqueRequest.SerializeToString,
-                response_deserializer=bloque__servicio__pb2.EscribirBloqueResponse.FromString,
+                request_serializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueRequest.SerializeToString,
+                response_deserializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueResponse.FromString,
                 _registered_method=True)
         self.LeerBloque = channel.unary_unary(
                 '/dfsha.BloqueServicio/LeerBloque',
-                request_serializer=bloque__servicio__pb2.LeerBloqueRequest.SerializeToString,
-                response_deserializer=bloque__servicio__pb2.LeerBloqueResponse.FromString,
+                request_serializer=Proto_dot_bloque__servicio__pb2.LeerBloqueRequest.SerializeToString,
+                response_deserializer=Proto_dot_bloque__servicio__pb2.LeerBloqueResponse.FromString,
                 _registered_method=True)
         self.EliminarBloque = channel.unary_unary(
                 '/dfsha.BloqueServicio/EliminarBloque',
-                request_serializer=bloque__servicio__pb2.EliminarBloqueRequest.SerializeToString,
-                response_deserializer=bloque__servicio__pb2.EliminarBloqueResponse.FromString,
+                request_serializer=Proto_dot_bloque__servicio__pb2.EliminarBloqueRequest.SerializeToString,
+                response_deserializer=Proto_dot_bloque__servicio__pb2.EliminarBloqueResponse.FromString,
+                _registered_method=True)
+        self.Heartbeat = channel.unary_unary(
+                '/dfsha.BloqueServicio/Heartbeat',
+                request_serializer=Proto_dot_bloque__servicio__pb2.HeartbeatRequest.SerializeToString,
+                response_deserializer=Proto_dot_bloque__servicio__pb2.HeartbeatResponse.FromString,
+                _registered_method=True)
+        self.ActualizarMembresia = channel.unary_unary(
+                '/dfsha.BloqueServicio/ActualizarMembresia',
+                request_serializer=Proto_dot_bloque__servicio__pb2.ActualizarMembresiaRequest.SerializeToString,
+                response_deserializer=Proto_dot_bloque__servicio__pb2.ActualizarMembresiaResponse.FromString,
                 _registered_method=True)
 
 
@@ -76,23 +86,47 @@ class BloqueServicioServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Heartbeat(self, request, context):
+        """Heartbeat de aplicación para identidad, disponibilidad y capacidad local.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ActualizarMembresia(self, request, context):
+        """Difunde la vista de membresía vigente a todos los nodos alcanzables.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_BloqueServicioServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'EscribirBloque': grpc.unary_unary_rpc_method_handler(
                     servicer.EscribirBloque,
-                    request_deserializer=bloque__servicio__pb2.EscribirBloqueRequest.FromString,
-                    response_serializer=bloque__servicio__pb2.EscribirBloqueResponse.SerializeToString,
+                    request_deserializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueRequest.FromString,
+                    response_serializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueResponse.SerializeToString,
             ),
             'LeerBloque': grpc.unary_unary_rpc_method_handler(
                     servicer.LeerBloque,
-                    request_deserializer=bloque__servicio__pb2.LeerBloqueRequest.FromString,
-                    response_serializer=bloque__servicio__pb2.LeerBloqueResponse.SerializeToString,
+                    request_deserializer=Proto_dot_bloque__servicio__pb2.LeerBloqueRequest.FromString,
+                    response_serializer=Proto_dot_bloque__servicio__pb2.LeerBloqueResponse.SerializeToString,
             ),
             'EliminarBloque': grpc.unary_unary_rpc_method_handler(
                     servicer.EliminarBloque,
-                    request_deserializer=bloque__servicio__pb2.EliminarBloqueRequest.FromString,
-                    response_serializer=bloque__servicio__pb2.EliminarBloqueResponse.SerializeToString,
+                    request_deserializer=Proto_dot_bloque__servicio__pb2.EliminarBloqueRequest.FromString,
+                    response_serializer=Proto_dot_bloque__servicio__pb2.EliminarBloqueResponse.SerializeToString,
+            ),
+            'Heartbeat': grpc.unary_unary_rpc_method_handler(
+                    servicer.Heartbeat,
+                    request_deserializer=Proto_dot_bloque__servicio__pb2.HeartbeatRequest.FromString,
+                    response_serializer=Proto_dot_bloque__servicio__pb2.HeartbeatResponse.SerializeToString,
+            ),
+            'ActualizarMembresia': grpc.unary_unary_rpc_method_handler(
+                    servicer.ActualizarMembresia,
+                    request_deserializer=Proto_dot_bloque__servicio__pb2.ActualizarMembresiaRequest.FromString,
+                    response_serializer=Proto_dot_bloque__servicio__pb2.ActualizarMembresiaResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -122,8 +156,8 @@ class BloqueServicio:
             request,
             target,
             '/dfsha.BloqueServicio/EscribirBloque',
-            bloque__servicio__pb2.EscribirBloqueRequest.SerializeToString,
-            bloque__servicio__pb2.EscribirBloqueResponse.FromString,
+            Proto_dot_bloque__servicio__pb2.EscribirBloqueRequest.SerializeToString,
+            Proto_dot_bloque__servicio__pb2.EscribirBloqueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -149,8 +183,8 @@ class BloqueServicio:
             request,
             target,
             '/dfsha.BloqueServicio/LeerBloque',
-            bloque__servicio__pb2.LeerBloqueRequest.SerializeToString,
-            bloque__servicio__pb2.LeerBloqueResponse.FromString,
+            Proto_dot_bloque__servicio__pb2.LeerBloqueRequest.SerializeToString,
+            Proto_dot_bloque__servicio__pb2.LeerBloqueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -176,8 +210,62 @@ class BloqueServicio:
             request,
             target,
             '/dfsha.BloqueServicio/EliminarBloque',
-            bloque__servicio__pb2.EliminarBloqueRequest.SerializeToString,
-            bloque__servicio__pb2.EliminarBloqueResponse.FromString,
+            Proto_dot_bloque__servicio__pb2.EliminarBloqueRequest.SerializeToString,
+            Proto_dot_bloque__servicio__pb2.EliminarBloqueResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Heartbeat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/dfsha.BloqueServicio/Heartbeat',
+            Proto_dot_bloque__servicio__pb2.HeartbeatRequest.SerializeToString,
+            Proto_dot_bloque__servicio__pb2.HeartbeatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ActualizarMembresia(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/dfsha.BloqueServicio/ActualizarMembresia',
+            Proto_dot_bloque__servicio__pb2.ActualizarMembresiaRequest.SerializeToString,
+            Proto_dot_bloque__servicio__pb2.ActualizarMembresiaResponse.FromString,
             options,
             channel_credentials,
             insecure,

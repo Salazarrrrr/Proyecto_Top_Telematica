@@ -1,95 +1,62 @@
-from flask import Flask, jsonify, request
-import uuid
+"""Arranque y configuración de la API REST del Gateway."""
 
-from node_client import NodeClient
-from particionar import dividir_archivo
+import os
+from pathlib import Path
 
-app = Flask(__name__)
-node_client = NodeClient()
+from flask import Flask
+
+from Gateway.auth import registrar_seguridad
+from Gateway.cluster import ClusterManager
+from Gateway.metadata import CatalogoArchivos
+from Gateway.node_client import NodeClient
+from Gateway.routes import blocks, cluster as cluster_routes, directories, files
 
 
-@app.route("/blocks", methods=["POST"])
-def escribir_bloque():
-    datos = request.get_json()
+def create_app():
+    app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("DFS_MAX_UPLOAD_BYTES", str(1024 ** 3)))
 
-    respuesta = node_client.escribir_bloque(
-        block_id=datos["block_id"],
-        file_id=datos["file_id"],
-        posicion=datos["posicion"],
-        contenido=datos["contenido"].encode(),
-        checksum=datos.get("checksum", "")
+    catalogo = CatalogoArchivos(Path(__file__).resolve().parent.parent / "metadata" / "archivos.json")
+    cluster = ClusterManager()
+    cluster.proveedor_archivos = catalogo.todos
+    app.extensions["dfsha"] = {
+        "node_client": NodeClient(),
+        "cluster": cluster,
+        "catalogo": catalogo,
+    }
+
+    registrar_seguridad(app)
+    for blueprint in (blocks.bp, files.bp, directories.bp, cluster_routes.bp):
+        app.register_blueprint(blueprint)
+    return app
+
+
+app = create_app()
+servicios = app.extensions["dfsha"]
+node_client = servicios["node_client"]
+cluster = servicios["cluster"]
+catalogo = servicios["catalogo"]
+
+
+def main():
+    cluster.iniciar_monitor(float(os.getenv("DFS_HEARTBEAT_INTERVAL", "5")))
+    host = os.getenv("DFS_GATEWAY_BIND", "127.0.0.1")
+    cert_path = os.getenv("DFS_GATEWAY_TLS_CERT")
+    key_path = os.getenv("DFS_GATEWAY_TLS_KEY")
+    if bool(cert_path) != bool(key_path):
+        raise RuntimeError("DFS_GATEWAY_TLS_CERT y DFS_GATEWAY_TLS_KEY deben configurarse juntos")
+    remoto = host not in {"localhost", "127.0.0.1", "::1"}
+    autenticacion = os.getenv("DFS_USERS")
+    if remoto and (not cert_path or not key_path or not autenticacion):
+        raise RuntimeError("La exposición remota requiere HTTPS y credenciales individuales en DFS_USERS")
+    app.run(
+        host=host,
+        port=int(os.getenv("DFS_GATEWAY_PORT", "8000")),
+        debug=False,
+        ssl_context=(cert_path, key_path) if cert_path and key_path else None,
+        threaded=True,
     )
-
-    return jsonify({
-        "exito": respuesta.exito,
-        "mensaje": respuesta.mensaje,
-        "block_id": respuesta.block_id
-    })
-
-
-@app.route("/blocks/<block_id>", methods=["GET"])
-def leer_bloque(block_id):
-    respuesta = node_client.leer_bloque(block_id)
-
-    if not respuesta.exito:
-        return jsonify({
-            "exito": False,
-            "mensaje": respuesta.mensaje
-        }), 404
-
-    return jsonify({
-        "exito": True,
-        "mensaje": respuesta.mensaje,
-        "block_id": respuesta.block_id,
-        "contenido": respuesta.contenido.decode(),
-        "checksum": respuesta.checksum
-    })
-
-
-@app.route("/blocks/<block_id>", methods=["DELETE"])
-def eliminar_bloque(block_id):
-    respuesta = node_client.eliminar_bloque(block_id)
-
-    return jsonify({
-        "exito": respuesta.exito,
-        "mensaje": respuesta.mensaje
-    })
-
-
-@app.route("/files", methods=["POST"])
-def subir_archivo():
-    ruta_archivo = request.json["ruta"]
-    file_id = str(uuid.uuid4())
-
-    bloques = 0
-
-    for posicion, contenido in dividir_archivo(ruta_archivo):
-
-        block_id = f"{file_id}-{posicion}"
-
-        respuesta = node_client.escribir_bloque(
-            block_id=block_id,
-            file_id=file_id,
-            posicion=posicion,
-            contenido=contenido,
-            checksum=""
-        )
-
-        if not respuesta.exito:
-            return jsonify({
-                "exito": False,
-                "mensaje": respuesta.mensaje
-            }), 500
-
-        bloques += 1
-
-    return jsonify({
-        "exito": True,
-        "file_id": file_id,
-        "bloques": bloques,
-        "mensaje": "Archivo dividido y almacenado correctamente"
-    })
 
 
 if __name__ == "__main__":
-    app.run(port=8000, debug=True)
+    main()

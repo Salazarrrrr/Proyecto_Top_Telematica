@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+metadata
+almacenamiento_bloques
+Deploy/certs/*
+!Deploy/certs/.gitignore
+.env
+Cluster/target
