@@ -1,14 +1,44 @@
 """Pruebas de quórums y operaciones del clúster."""
 
 import hashlib
+import json
+import os
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
+from pathlib import Path
 
 from Gateway.cluster import ClusterManager
 
 
 class TestQuorum(unittest.TestCase):
+    def test_factor_se_conserva_al_reiniciar_el_gateway(self):
+        with tempfile.TemporaryDirectory() as directorio, patch.dict(
+            os.environ, {"DFS_CLUSTER_CONFIG": os.path.join(directorio, "cluster.json")}
+        ), patch("Gateway.cluster.cluster_core.NodeClient") as cliente:
+            cliente.return_value.canal = SimpleNamespace(close=lambda: None)
+            primero = ClusterManager(
+                nodos="nodo-a:1,nodo-b:2,nodo-c:3", factor_replicacion=3,
+                quorum_lectura=2, quorum_escritura=2,
+            )
+            primero.factor_replicacion = 2
+            primero.guardar_factor_replicacion()
+            primero.cerrar()
+            segundo = ClusterManager(
+                nodos="nodo-a:1,nodo-b:2,nodo-c:3",
+                quorum_lectura=2, quorum_escritura=2,
+            )
+            try:
+                self.assertEqual(segundo.factor_replicacion, 2)
+                self.assertEqual(
+                    json.loads(Path(os.path.join(directorio, "cluster.json")).read_text())[
+                        "factor_replicacion"
+                    ], 2,
+                )
+            finally:
+                segundo.cerrar()
+
     def test_rechaza_quorums_sin_interseccion(self):
         with self.assertRaisesRegex(ValueError, r"R \+ W"):
             ClusterManager(

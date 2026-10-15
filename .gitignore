@@ -8,3 +8,4 @@ __pycache__/
 metadata/
 almacenamiento_bloques/
 Cluster/target/
+.test_tmp/

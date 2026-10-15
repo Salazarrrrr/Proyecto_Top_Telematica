@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 import grpc
 
 from Gateway.services import servicios
+from Gateway.auth import autorizar_administrador
 
 bp = Blueprint("cluster", __name__)
 
@@ -20,6 +21,9 @@ def estado_cluster():
 
 @bp.route("/cluster/rebalance", methods=["POST"])
 def rebalancear_cluster():
+    no_autorizado = autorizar_administrador()
+    if no_autorizado:
+        return no_autorizado
     datos = request.get_json(silent=True) or {}
     direccion = datos.get("direccion")
     if not direccion:
@@ -41,6 +45,9 @@ def rebalancear_cluster():
 
 @bp.route("/cluster/replication", methods=["PUT"])
 def cambiar_factor_replicacion():
+    no_autorizado = autorizar_administrador()
+    if no_autorizado:
+        return no_autorizado
     datos = request.get_json(silent=True) or {}
     try:
         resultado = servicios()["cluster"].cambiar_factor_replicacion(
@@ -59,6 +66,9 @@ def cambiar_factor_replicacion():
 
 @bp.route("/cluster/nodes/<path:direccion>", methods=["DELETE"])
 def retirar_nodo(direccion):
+    no_autorizado = autorizar_administrador()
+    if no_autorizado:
+        return no_autorizado
     if direccion not in servicios()["cluster"].direcciones:
         return jsonify({"exito": False, "mensaje": "Nodo no registrado"}), 404
     if len(servicios()["cluster"].direcciones) <= 1:

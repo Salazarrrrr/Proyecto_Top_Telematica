@@ -76,6 +76,14 @@ class TestAislamientoUsuarios(unittest.TestCase):
             respuesta = self.cliente.get("/files")
         self.assertEqual(respuesta.status_code, 503)
 
+    def test_operaciones_de_cluster_requieren_token_administrador(self):
+        respuesta = self.cliente.put(
+            "/cluster/replication",
+            json={"factor": 2},
+            headers=self.cabecera("ana"),
+        )
+        self.assertEqual(respuesta.status_code, 403)
+
 
 if __name__ == "__main__":
     unittest.main()

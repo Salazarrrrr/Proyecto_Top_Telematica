@@ -75,6 +75,7 @@ $env:DFS_READ_QUORUM = "2"
 $env:DFS_WRITE_QUORUM = "2"
 $env:DFS_BLOCK_SIZE = "67108864"
 $env:DFS_USERS = '{"ana":"token-largo-ana","luis":"token-largo-luis"}'
+$env:DFS_ADMIN_TOKEN = "token-administrador-secreto"
 python -m Gateway.app
 ```
 
@@ -96,6 +97,8 @@ python -m Client.client delete archivo.pdf --usuario ana
 ```
 
 El cliente solo permite operar con la identidad de `DFS_DEFAULT_USER` y su token individual `DFS_USER_TOKEN`; el Gateway deriva el propietario de ese token. Para archivos grandes, ajusta `DFS_MAX_UPLOAD_BYTES`; el tamaño de bloque se controla con `DFS_BLOCK_SIZE` (64 MiB por defecto). El Gateway guarda el catálogo en `metadata/archivos.json`; conserva esa carpeta para mantener los metadatos entre reinicios.
+
+El factor de replicación se puede cambiar en ejecución mediante `PUT /cluster/replication`, pero esa operación exige `DFS_ADMIN_TOKEN`. El valor se guarda en `metadata/cluster.json` y se recupera al reiniciar el Gateway. El nuevo factor solo se confirma después de alcanzar el quórum de escritura; si hay nodos caídos, las limpiezas pendientes se reintentan durante los heartbeats.
 
 ## API principal
 

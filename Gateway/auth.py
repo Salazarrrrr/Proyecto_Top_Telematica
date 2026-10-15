@@ -17,12 +17,13 @@ def registrar_seguridad(app):
 
 def autenticar_solicitud():
     g.usuario_autenticado = None
+    recibido = request.headers.get("Authorization", "")
+    admin = os.getenv("DFS_ADMIN_TOKEN", "")
+    if admin and recibido.startswith("Bearer ") and hmac.compare_digest(recibido[7:], admin):
+        g.usuario_autenticado = "admin"
+        return None
     if request.path == "/blocks" or request.path.startswith("/blocks/"):
-        admin = os.getenv("DFS_ADMIN_TOKEN", "")
-        recibido = request.headers.get("Authorization", "")
-        if admin and recibido.startswith("Bearer ") and hmac.compare_digest(recibido[7:], admin):
-            g.usuario_autenticado = "admin"
-            return None
+        return jsonify({"exito": False, "mensaje": "Se requiere token de administrador"}), 403
 
     usuarios = os.getenv("DFS_USERS")
     if not usuarios:
@@ -70,6 +71,12 @@ def autorizar_diagnostico():
         return jsonify({"exito": False, "mensaje": "Endpoint de diagnóstico deshabilitado"}), 404
     recibido = request.headers.get("Authorization", "")
     if not recibido.startswith("Bearer ") or not hmac.compare_digest(recibido[7:], token_admin):
+        return jsonify({"exito": False, "mensaje": "Se requiere token de administrador"}), 403
+    return None
+
+
+def autorizar_administrador():
+    if getattr(g, "usuario_autenticado", None) != "admin":
         return jsonify({"exito": False, "mensaje": "Se requiere token de administrador"}), 403
     return None
 

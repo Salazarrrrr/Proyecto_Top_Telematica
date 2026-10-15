@@ -1,6 +1,7 @@
 """Recuperación de réplicas y cambios en el factor de replicación."""
 
 import grpc
+import threading
 
 
 class ReplicationOperations:
@@ -77,6 +78,10 @@ class ReplicationOperations:
                         eliminados += 1
                 except grpc.RpcError as error:
                     self._limpiezas_pendientes.add((sobrante, block_id))
+        try:
+            self.guardar_factor_replicacion()
+        except OSError as error:
+            raise RuntimeError(f"No se pudo persistir el factor de replicación: {error}") from error
         return {
             "copias_confirmadas": guardados,
             "copias_eliminadas": eliminados,

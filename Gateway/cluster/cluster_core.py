@@ -1,8 +1,10 @@
 """Configuración, quórums, heartbeats y acceso a bloques."""
 
 import hashlib
+import json
 import os
 import threading
+from pathlib import Path
 
 import grpc
 
@@ -16,8 +18,13 @@ class ClusterCore:
         self.direcciones = list(dict.fromkeys(
             direccion.strip() for direccion in nodos.split(",") if direccion.strip()
         ))
+        self.configuracion_path = Path(os.getenv(
+            "DFS_CLUSTER_CONFIG", "metadata/cluster.json"
+        ))
+        factor_guardado = self._leer_factor_guardado()
         self.factor_replicacion = max(1, int(
             factor_replicacion if factor_replicacion is not None
+            else factor_guardado if factor_guardado is not None
             else os.getenv("DFS_REPLICATION_FACTOR", "3")
         ))
         self.quorum_lectura = max(1, int(
@@ -41,6 +48,25 @@ class ClusterCore:
         self.proveedor_archivos = None
         self._monitor_stop = threading.Event()
         self._monitor_thread = None
+
+    def _leer_factor_guardado(self):
+        try:
+            datos = json.loads(self.configuracion_path.read_text(encoding="utf-8"))
+            factor = datos.get("factor_replicacion")
+            return int(factor) if factor is not None else None
+        except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
+            return None
+
+    def guardar_factor_replicacion(self):
+        self.configuracion_path.parent.mkdir(parents=True, exist_ok=True)
+        temporal = self.configuracion_path.with_suffix(".tmp")
+        contenido = json.dumps(
+            {"factor_replicacion": self.factor_replicacion},
+            ensure_ascii=False,
+            indent=2,
+        )
+        temporal.write_text(contenido + "\n", encoding="utf-8")
+        os.replace(temporal, self.configuracion_path)
 
     def _validar_quorums(self, replicas):
         replicas = int(replicas)
