@@ -85,5 +85,41 @@ class TestAislamientoUsuarios(unittest.TestCase):
         self.assertEqual(respuesta.status_code, 403)
 
 
+class TestSesionesYRoles(unittest.TestCase):
+    def setUp(self):
+        self.directorio = tempfile.TemporaryDirectory()
+        variables = {
+            "DFS_USERS": json.dumps({"demo": "token-demo"}),
+            "DFS_USER_PASSWORDS": json.dumps({"admin": "Admin123!", "demo": "Demo123!"}),
+            "DFS_USER_ROLES": json.dumps({"admin": "admin", "demo": "usuario"}),
+            "DFS_AUTH_USERS_FILE": str(Path(self.directorio.name) / "usuarios.json"),
+        }
+        self.variables = patch.dict(os.environ, variables)
+        self.variables.start()
+        with patch("Gateway.app.CatalogoArchivos", return_value=CatalogoArchivos(Path(self.directorio.name) / "archivos.json")), \
+             patch("Gateway.app.ClusterManager", return_value=MagicMock()), \
+             patch("Gateway.app.NodeClient", return_value=MagicMock()):
+            self.app = create_app()
+        self.cliente = self.app.test_client()
+
+    def tearDown(self):
+        self.variables.stop()
+        self.directorio.cleanup()
+
+    def test_login_logout_y_roles(self):
+        demo = self.cliente.post("/auth/login", json={"usuario": "demo", "password": "Demo123!"})
+        self.assertEqual(demo.status_code, 200)
+        token_demo = demo.json["token"]
+        self.assertEqual(self.cliente.get("/auth/me", headers={"Authorization": f"Bearer {token_demo}"}).json["rol"], "usuario")
+        self.assertEqual(self.cliente.post("/auth/users", json={"usuario": "otro", "password": "Password1!"}, headers={"Authorization": f"Bearer {token_demo}"}).status_code, 403)
+        admin = self.cliente.post("/auth/login", json={"usuario": "admin", "password": "Admin123!"})
+        self.assertEqual(admin.status_code, 200)
+        token_admin = admin.json["token"]
+        creado = self.cliente.post("/auth/users", json={"usuario": "otro", "password": "Password1!", "rol": "usuario"}, headers={"Authorization": f"Bearer {token_admin}"})
+        self.assertEqual(creado.status_code, 201)
+        self.assertEqual(self.cliente.post("/auth/logout", headers={"Authorization": f"Bearer {token_demo}"}).status_code, 200)
+        self.assertEqual(self.cliente.get("/auth/me", headers={"Authorization": f"Bearer {token_demo}"}).status_code, 401)
+
+
 if __name__ == "__main__":
     unittest.main()

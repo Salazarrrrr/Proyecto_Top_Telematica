@@ -34,6 +34,7 @@ En otra terminal, configura el cliente con su credencial individual y ejecuta la
 $env:DFS_GATEWAY_URL = "https://localhost:8443"
 $env:DFS_GATEWAY_TLS_CA = (Resolve-Path Deploy/certs/ca.crt).Path
 $env:DFS_DEFAULT_USER = "demo"
+$env:DFS_USER_PASSWORDS = '{"admin":"CAMBIAR_PASSWORD_ADMIN","demo":"CAMBIAR_PASSWORD_DEMO"}'
 $credencial = Get-Content Deploy/.env | Where-Object { $_ -like "DFS_USERS=*" }
 $usuarios = (($credencial -split "=", 2)[1]).Trim("'") | ConvertFrom-Json
 $env:DFS_USER_TOKEN = $usuarios.demo
@@ -79,7 +80,22 @@ $env:DFS_ADMIN_TOKEN = "token-administrador-secreto"
 python -m Gateway.app
 ```
 
-`DFS_USERS` es obligatorio en el Gateway: configura un objeto JSON con un token secreto, único y largo para cada usuario (por ejemplo, `{"ana":"token-largo-ana","luis":"token-largo-luis"}`). El Gateway obtiene la identidad del token y no confía en el usuario enviado como parámetro. El cliente recibe únicamente su token en `DFS_USER_TOKEN`; no compartas el mapa completo con clientes. Si faltan credenciales válidas, las solicitudes se rechazan; no hay acceso anónimo ni token compartido para archivos.
+`DFS_USERS` mantiene compatibilidad con tokens fijos. El flujo recomendado usa `DFS_USER_PASSWORDS`: el Gateway crea inicialmente `admin` (rol administrador) y `demo` (rol usuario), guarda las contraseñas con PBKDF2 y emite sesiones temporales. En el despliegue local esas credenciales son `Admin123!` y `Demo123!`; cámbialas antes de una entrega real. El archivo `metadata/usuarios.json` queda en el volumen del Gateway y no se sube a Git.
+
+Para usar sesiones desde la CLI:
+
+```powershell
+$env:DFS_GATEWAY_URL = "https://localhost:8443"
+$env:DFS_GATEWAY_TLS_CA = (Resolve-Path Deploy/certs/ca.crt).Path
+$env:DFS_DEFAULT_USER = "demo"
+& .\.venv\Scripts\python.exe -m Client.client login demo
+& .\.venv\Scripts\python.exe -m Client.client whoami
+& .\.venv\Scripts\python.exe -m Client.client create-user ana --rol usuario
+& .\.venv\Scripts\python.exe -m Client.client shell
+& .\.venv\Scripts\python.exe -m Client.client logout
+```
+
+Solo una sesión con rol `admin` puede crear usuarios mediante `POST /auth/users`; los usuarios normales únicamente acceden a sus propios archivos. `POST /auth/login`, `POST /auth/logout` y `GET /auth/me` completan el ciclo de sesión.
 
 Los nodos escuchan solo en `127.0.0.1` por defecto. Las rutas de diagnóstico `/blocks` están desactivadas si no configuras `DFS_ADMIN_TOKEN` y requieren ese token aparte.
 
@@ -96,7 +112,7 @@ python -m Client.client get archivo.pdf --salida .\copia.pdf --usuario ana
 python -m Client.client delete archivo.pdf --usuario ana
 ```
 
-El cliente solo permite operar con la identidad de `DFS_DEFAULT_USER` y su token individual `DFS_USER_TOKEN`; el Gateway deriva el propietario de ese token. Para archivos grandes, ajusta `DFS_MAX_UPLOAD_BYTES`; el tamaño de bloque se controla con `DFS_BLOCK_SIZE` (64 MiB por defecto). El Gateway guarda el catálogo en `metadata/archivos.json`; conserva esa carpeta para mantener los metadatos entre reinicios.
+El cliente guarda el token de sesión en `.dfsha_session.json` dentro del perfil del usuario. El Gateway deriva el propietario de ese token y no confía en el usuario enviado como parámetro. Para archivos grandes, ajusta `DFS_MAX_UPLOAD_BYTES`; el tamaño de bloque se controla con `DFS_BLOCK_SIZE` (64 MiB por defecto). El Gateway guarda el catálogo en `metadata/archivos.json`; conserva esa carpeta para mantener los metadatos entre reinicios.
 
 El factor de replicación se puede cambiar en ejecución mediante `PUT /cluster/replication`, pero esa operación exige `DFS_ADMIN_TOKEN`. El valor se guarda en `metadata/cluster.json` y se recupera al reiniciar el Gateway. El nuevo factor solo se confirma después de alcanzar el quórum de escritura; si hay nodos caídos, las limpiezas pendientes se reintentan durante los heartbeats.
 
@@ -112,6 +128,8 @@ El factor de replicación se puede cambiar en ejecución mediante `PUT /cluster/
 - `POST /cluster/rebalance`: registra un nodo, distribuye las réplicas según el anillo actualizado y reporta cualquier limpieza pendiente.
 - `DELETE /cluster/nodes/<direccion>`: salida controlada; migra los bloques antes de retirar el nodo.
 - `PUT /cluster/replication` con `{"factor": N}`: ajusta N y confirma primero las copias destino; reporta y reintenta la limpieza de excedentes si un nodo no está disponible.
+- `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`: ciclo de vida de sesiones.
+- `POST /auth/users` con `{"usuario":"...","password":"...","rol":"usuario|admin"}`: creación restringida a administradores.
 
 El CLI transmite el archivo local al Gateway con multipart, por lo que el cliente y el servidor pueden estar en equipos distintos. Ofrece `store`, `get`, `list`, `ls`, `mkdir`, `rmdir` y un `shell` interactivo con `cd`, `pwd` y `rm`. Todas las solicitudes HTTP usan `Authorization: Bearer ...` cuando se configura autenticación.
 

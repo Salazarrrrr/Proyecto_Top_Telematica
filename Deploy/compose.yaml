@@ -78,6 +78,9 @@ services:
       DFS_GATEWAY_TLS_CERT: /run/certs/gateway.crt
       DFS_GATEWAY_TLS_KEY: /run/certs/gateway.key
       DFS_USERS: ${DFS_USERS:?set individual user tokens in Deploy/.env}
+      DFS_USER_PASSWORDS: ${DFS_USER_PASSWORDS:?set initial user passwords in Deploy/.env}
+      DFS_USER_ROLES: ${DFS_USER_ROLES:-{"admin":"admin","demo":"usuario"}}
+      DFS_AUTH_USERS_FILE: ${DFS_AUTH_USERS_FILE:-/app/metadata/usuarios.json}
       DFS_ADMIN_TOKEN: ${DFS_ADMIN_TOKEN:?set an admin token in Deploy/.env}
       DFS_NODE_TOKEN: ${DFS_NODE_TOKEN:?set DFS_NODE_TOKEN in Deploy/.env}
       DFS_NODE_TLS_CA: /run/certs/ca.crt

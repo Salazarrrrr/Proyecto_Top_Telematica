@@ -5,8 +5,10 @@ import os
 import posixpath
 import shlex
 import ssl
+import sys
 import tempfile
 import uuid
+import getpass
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
@@ -14,6 +16,7 @@ from urllib.request import Request, urlopen
 
 GATEWAY = os.getenv("DFS_GATEWAY_URL", "http://127.0.0.1:8000").rstrip("/")
 DEFAULT_USER = os.getenv("DFS_DEFAULT_USER", "demo")
+SESSION_FILE = os.getenv("DFS_SESSION_FILE", os.path.join(os.path.expanduser("~"), ".dfsha_session.json"))
 
 
 def contexto_https(url):
@@ -39,17 +42,83 @@ def solicitar(method, path, datos=None, usuario=None):
     return json.loads(respuesta.read().decode("utf-8"))
 
 
+def leer_sesion():
+    try:
+        with open(SESSION_FILE, encoding="utf-8") as archivo:
+            sesion = json.load(archivo)
+        return sesion if isinstance(sesion, dict) else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def guardar_sesion(sesion):
+    ruta_temporal = SESSION_FILE + ".tmp"
+    with open(ruta_temporal, "w", encoding="utf-8") as archivo:
+        json.dump(sesion, archivo)
+    os.replace(ruta_temporal, SESSION_FILE)
+
+
 def token_para_usuario(usuario=None):
     identidad = os.getenv("DFS_DEFAULT_USER", DEFAULT_USER)
-    usuario = usuario or identidad
-    if usuario != identidad:
+    sesion = leer_sesion()
+    # Los argumentos antiguos tienen ``demo`` como valor predeterminado; una
+    # sesión activa debe prevalecer para que el shell no consulte al usuario anterior.
+    if sesion and (usuario is None or usuario == identidad):
+        usuario = sesion.get("usuario")
+    else:
+        usuario = usuario or identidad
+    if usuario != identidad and not (sesion and sesion.get("usuario") == usuario):
         raise ValueError(
             f"Esta CLI está autenticada como '{identidad}' y no puede cambiar a '{usuario}'"
         )
-    token = os.getenv("DFS_USER_TOKEN")
+    token = sesion.get("token") if sesion and sesion.get("usuario") == usuario else None
+    token = token or os.getenv("DFS_USER_TOKEN")
     if not token:
         raise ValueError("Define DFS_USER_TOKEN con el token individual de este usuario")
     return token
+
+
+def comando_login(args):
+    password = args.password or getpass.getpass("Contraseña: ")
+    respuesta = solicitar_sin_autenticacion("POST", "/auth/login", {
+        "usuario": args.usuario, "password": password,
+    })
+    guardar_sesion(respuesta)
+    print(f"Sesión iniciada como {respuesta['usuario']} ({respuesta['rol']}).")
+
+
+def solicitar_sin_autenticacion(method, path, datos=None):
+    cuerpo = json.dumps(datos).encode("utf-8") if datos is not None else None
+    headers = {"Accept": "application/json"}
+    if datos is not None:
+        headers["Content-Type"] = "application/json"
+    respuesta = urlopen(Request(GATEWAY + path, data=cuerpo, headers=headers, method=method),
+                        timeout=30, context=contexto_https(GATEWAY))
+    return json.loads(respuesta.read().decode("utf-8"))
+
+
+def comando_logout(_args):
+    sesion = leer_sesion()
+    if sesion and sesion.get("token"):
+        solicitar("POST", "/auth/logout", usuario=sesion.get("usuario"))
+    try:
+        os.unlink(SESSION_FILE)
+    except FileNotFoundError:
+        pass
+    print("Sesión cerrada.")
+
+
+def comando_whoami(_args):
+    respuesta = solicitar("GET", "/auth/me")
+    print(f"{respuesta['usuario']} ({respuesta['rol']})")
+
+
+def comando_create_user(args):
+    password = args.password or getpass.getpass("Contraseña del nuevo usuario: ")
+    respuesta = solicitar("POST", "/auth/users", {
+        "usuario": args.usuario, "password": password, "rol": args.rol,
+    }, usuario=args.admin)
+    print(f"Usuario creado: {respuesta['usuario']} ({respuesta['rol']}).")
 
 
 def subir_archivo_local(ruta, usuario, directorio="/"):
@@ -246,6 +315,7 @@ def comando_shell(args):
                 print("""Comandos disponibles:
   pwd                         muestra la carpeta remota actual
   ls [ruta]                   lista carpetas y archivos
+  list                        lista los archivos de la carpeta actual
   cd <ruta>                   cambia la carpeta remota
   mkdir <ruta>                crea una carpeta remota
   rmdir <ruta>                elimina una carpeta vacía
@@ -255,7 +325,7 @@ def comando_shell(args):
   exit                        cierra el cliente""")
             if comando == "pwd":
                 print(actual)
-            elif comando == "ls":
+            elif comando in {"ls", "list"}:
                 destino = ruta_remota(actual, valores[0] if valores else ".")
                 contenido = solicitar("GET", "/directories?" + urlencode({"path": destino}), usuario=args.usuario)
                 print(f"{contenido['ruta']}/")
@@ -293,6 +363,24 @@ def comando_shell(args):
 def crear_parser():
     parser = argparse.ArgumentParser(description="Cliente de consola de DFSha")
     subparsers = parser.add_subparsers(dest="comando", required=True)
+
+    login = subparsers.add_parser("login", help="inicia una sesión")
+    login.add_argument("usuario", nargs="?", default=DEFAULT_USER)
+    login.add_argument("--password")
+    login.set_defaults(func=comando_login)
+
+    logout = subparsers.add_parser("logout", help="cierra la sesión actual")
+    logout.set_defaults(func=comando_logout)
+
+    whoami = subparsers.add_parser("whoami", help="muestra la identidad actual")
+    whoami.set_defaults(func=comando_whoami)
+
+    crear_usuario = subparsers.add_parser("create-user", help="crea un usuario (solo admin)")
+    crear_usuario.add_argument("usuario")
+    crear_usuario.add_argument("--rol", choices=["usuario", "admin"], default="usuario")
+    crear_usuario.add_argument("--password")
+    crear_usuario.add_argument("--admin", default="admin")
+    crear_usuario.set_defaults(func=comando_create_user)
 
     store = subparsers.add_parser("store", aliases=["send"])
     store.add_argument("archivo")
@@ -341,7 +429,10 @@ def crear_parser():
 
 if __name__ == "__main__":
     try:
-        argumentos = crear_parser().parse_args()
+        argumentos_cli = sys.argv[1:]
+        if argumentos_cli:
+            argumentos_cli[0] = argumentos_cli[0].lower()
+        argumentos = crear_parser().parse_args(argumentos_cli)
         argumentos.func(argumentos)
     except (HTTPError, ValueError, OSError, http.client.HTTPException) as error:
         print(f"Error: {error}")

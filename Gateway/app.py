@@ -9,7 +9,7 @@ from Gateway.auth import registrar_seguridad
 from Gateway.cluster import ClusterManager
 from Gateway.metadata import CatalogoArchivos
 from Gateway.node_client import NodeClient
-from Gateway.routes import blocks, cluster as cluster_routes, directories, files
+from Gateway.routes import auth as auth_routes, blocks, cluster as cluster_routes, directories, files
 
 
 def create_app():
@@ -26,7 +26,7 @@ def create_app():
     }
 
     registrar_seguridad(app)
-    for blueprint in (blocks.bp, files.bp, directories.bp, cluster_routes.bp):
+    for blueprint in (auth_routes.bp, blocks.bp, files.bp, directories.bp, cluster_routes.bp):
         app.register_blueprint(blueprint)
     return app
 
