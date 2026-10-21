@@ -39,7 +39,7 @@ def users_create():
         return no_autorizado
     datos = request.get_json(silent=True) or {}
     try:
-        crear_usuario(datos.get("usuario"), datos.get("password"), datos.get("rol", "usuario"))
+        usuario = crear_usuario(datos.get("usuario"), datos.get("password"), datos.get("rol", "usuario"))
     except ValueError as error:
         return jsonify({"exito": False, "mensaje": str(error)}), 400
-    return jsonify({"exito": True, "usuario": datos["usuario"], "rol": datos.get("rol", "usuario")}), 201
+    return jsonify({"exito": True, "usuario": usuario, "rol": datos.get("rol", "usuario")}), 201

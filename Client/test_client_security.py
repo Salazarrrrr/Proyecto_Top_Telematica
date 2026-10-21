@@ -25,8 +25,9 @@ class TestCredencialCliente(unittest.TestCase):
 
     def test_cli_rechaza_ausencia_de_token(self):
         with patch.dict("os.environ", {"DFS_DEFAULT_USER": "ana"}, clear=True):
-            with self.assertRaisesRegex(ValueError, "DFS_USER_TOKEN"):
-                token_para_usuario()
+            with patch("Client.client.leer_sesion", return_value=None):
+                with self.assertRaisesRegex(ValueError, "DFS_USER_TOKEN"):
+                    token_para_usuario()
 
 
 if __name__ == "__main__":

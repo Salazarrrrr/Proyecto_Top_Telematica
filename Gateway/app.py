@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, jsonify
 
 from Gateway.auth import registrar_seguridad
 from Gateway.cluster import ClusterManager
@@ -24,6 +24,10 @@ def create_app():
         "cluster": cluster,
         "catalogo": catalogo,
     }
+
+    @app.get("/health")
+    def health():
+        return jsonify({"exito": True, "servicio": "gateway"})
 
     registrar_seguridad(app)
     for blueprint in (auth_routes.bp, blocks.bp, files.bp, directories.bp, cluster_routes.bp):
@@ -46,9 +50,9 @@ def main():
     if bool(cert_path) != bool(key_path):
         raise RuntimeError("DFS_GATEWAY_TLS_CERT y DFS_GATEWAY_TLS_KEY deben configurarse juntos")
     remoto = host not in {"localhost", "127.0.0.1", "::1"}
-    autenticacion = os.getenv("DFS_USERS")
+    autenticacion = os.getenv("DFS_USERS") or os.getenv("DFS_USER_PASSWORDS")
     if remoto and (not cert_path or not key_path or not autenticacion):
-        raise RuntimeError("La exposición remota requiere HTTPS y credenciales individuales en DFS_USERS")
+        raise RuntimeError("La exposición remota requiere HTTPS y usuarios configurados")
     app.run(
         host=host,
         port=int(os.getenv("DFS_GATEWAY_PORT", "8000")),

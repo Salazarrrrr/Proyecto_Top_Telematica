@@ -120,6 +120,20 @@ class TestSesionesYRoles(unittest.TestCase):
         self.assertEqual(self.cliente.post("/auth/logout", headers={"Authorization": f"Bearer {token_demo}"}).status_code, 200)
         self.assertEqual(self.cliente.get("/auth/me", headers={"Authorization": f"Bearer {token_demo}"}).status_code, 401)
 
+    def test_sesion_no_depende_de_tokens_estaticos(self):
+        with patch.dict(os.environ, {"DFS_USERS": ""}):
+            login = self.cliente.post("/auth/login", json={"usuario": "demo", "password": "Demo123!"})
+            self.assertEqual(login.status_code, 200)
+            respuesta = self.cliente.get(
+                "/files", headers={"Authorization": f"Bearer {login.json['token']}"}
+            )
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_health_esta_disponible_sin_autenticacion(self):
+        respuesta = self.cliente.get("/health")
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json["servicio"], "gateway")
+
 
 if __name__ == "__main__":
     unittest.main()

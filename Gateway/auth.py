@@ -7,6 +7,7 @@ import hashlib
 import secrets
 import threading
 import time
+import re
 from functools import wraps
 from pathlib import Path
 
@@ -128,9 +129,11 @@ def autenticar_solicitud():
 
     usuarios = os.getenv("DFS_USERS")
     if not usuarios:
+        if estado["usuarios"]:
+            return jsonify({"exito": False, "mensaje": "Autenticación requerida"}), 401
         return jsonify({
             "exito": False,
-            "mensaje": "El Gateway requiere credenciales individuales configuradas en DFS_USERS",
+            "mensaje": "El Gateway requiere usuarios con contraseña o tokens configurados en DFS_USERS",
         }), 503
     try:
         tokens_por_usuario = json.loads(usuarios)
@@ -207,8 +210,11 @@ def crear_usuario(usuario, password, rol):
     estado = current_app.extensions["auth"]
     if rol not in {"usuario", "admin"}:
         raise ValueError("El rol debe ser usuario o admin")
-    if not isinstance(usuario, str) or not usuario.strip() or len(usuario) > 64:
+    if not isinstance(usuario, str):
         raise ValueError("Nombre de usuario inválido")
+    usuario = usuario.strip()
+    if not re.fullmatch(r"[A-Za-z0-9._-]{3,64}", usuario):
+        raise ValueError("El usuario debe tener entre 3 y 64 caracteres: letras, números, punto, guion o guion bajo")
     if not isinstance(password, str) or len(password) < 8:
         raise ValueError("La contraseña debe tener al menos 8 caracteres")
     with estado["bloqueo"]:
@@ -216,6 +222,7 @@ def crear_usuario(usuario, password, rol):
             raise ValueError("El usuario ya existe")
         estado["usuarios"][usuario] = {"password": _hash_password(password), "rol": rol}
         guardar_usuarios(estado)
+    return usuario
 
 
 def bloquear_operacion_archivo(funcion):

@@ -28,18 +28,15 @@ Prueba el despliegue Compose desde PowerShell. Docker Desktop debe estar iniciad
 docker compose --env-file Deploy/.env -f Deploy/compose.yaml up --build -d
 ```
 
-En otra terminal, configura el cliente con su credencial individual y ejecuta las operaciones de prueba:
+En otra terminal, configura el cliente e inicia sesión. Si creaste el entorno con `configurar_entorno.ps1`, usa las contraseñas que el script mostró al finalizar:
 
 ```powershell
 $env:DFS_GATEWAY_URL = "https://localhost:8443"
 $env:DFS_GATEWAY_TLS_CA = (Resolve-Path Deploy/certs/ca.crt).Path
 $env:DFS_DEFAULT_USER = "demo"
-$env:DFS_USER_PASSWORDS = '{"admin":"CAMBIAR_PASSWORD_ADMIN","demo":"CAMBIAR_PASSWORD_DEMO"}'
-$credencial = Get-Content Deploy/.env | Where-Object { $_ -like "DFS_USERS=*" }
-$usuarios = (($credencial -split "=", 2)[1]).Trim("'") | ConvertFrom-Json
-$env:DFS_USER_TOKEN = $usuarios.demo
-Remove-Variable credencial, usuarios
 $python = ".\.venv\Scripts\python.exe"
+
+& $python -m Client.client login demo
 
 Set-Content -NoNewline -Path .\prueba.txt -Value "prueba DFSha"
 & $python -m Client.client store .\prueba.txt
@@ -48,6 +45,7 @@ Set-Content -NoNewline -Path .\prueba.txt -Value "prueba DFSha"
 Get-FileHash .\prueba.txt -Algorithm SHA256
 Get-FileHash .\copia.txt -Algorithm SHA256
 & $python -m Client.client delete prueba.txt
+& $python -m Client.client logout
 docker compose --env-file Deploy/.env -f Deploy/compose.yaml down
 ```
 
@@ -75,12 +73,13 @@ $env:DFS_REPLICATION_FACTOR = "3"
 $env:DFS_READ_QUORUM = "2"
 $env:DFS_WRITE_QUORUM = "2"
 $env:DFS_BLOCK_SIZE = "67108864"
-$env:DFS_USERS = '{"ana":"token-largo-ana","luis":"token-largo-luis"}'
+$env:DFS_USER_PASSWORDS = '{"admin":"CAMBIAR_PASSWORD_ADMIN","ana":"CAMBIAR_PASSWORD_ANA"}'
+$env:DFS_USER_ROLES = '{"admin":"admin","ana":"usuario"}'
 $env:DFS_ADMIN_TOKEN = "token-administrador-secreto"
 python -m Gateway.app
 ```
 
-`DFS_USERS` mantiene compatibilidad con tokens fijos. El flujo recomendado usa `DFS_USER_PASSWORDS`: el Gateway crea inicialmente `admin` (rol administrador) y `demo` (rol usuario), guarda las contraseñas con PBKDF2 y emite sesiones temporales. En el despliegue local esas credenciales son `Admin123!` y `Demo123!`; cámbialas antes de una entrega real. El archivo `metadata/usuarios.json` queda en el volumen del Gateway y no se sube a Git.
+`DFS_USERS` mantiene compatibilidad con tokens fijos. El flujo recomendado usa `DFS_USER_PASSWORDS`: el Gateway crea inicialmente `admin` (rol administrador) y `demo` (rol usuario), guarda las contraseñas con PBKDF2 y emite sesiones temporales. `configurar_entorno.ps1` genera contraseñas aleatorias y las muestra una sola vez. El archivo `metadata/usuarios.json` queda en el volumen del Gateway y no se sube a Git.
 
 Para usar sesiones desde la CLI:
 
@@ -97,11 +96,11 @@ $env:DFS_DEFAULT_USER = "demo"
 
 Solo una sesión con rol `admin` puede crear usuarios mediante `POST /auth/users`; los usuarios normales únicamente acceden a sus propios archivos. `POST /auth/login`, `POST /auth/logout` y `GET /auth/me` completan el ciclo de sesión.
 
-Los nodos escuchan solo en `127.0.0.1` por defecto. Las rutas de diagnóstico `/blocks` están desactivadas si no configuras `DFS_ADMIN_TOKEN` y requieren ese token aparte.
+Los nodos escuchan solo en `127.0.0.1` por defecto. Las rutas de diagnóstico `/blocks` están desactivadas si no configuras `DFS_ADMIN_TOKEN` y requieren ese token aparte. `GET /health` no requiere autenticación y permite que Docker o un balanceador comprueben la disponibilidad del Gateway.
 
-Los nodos cifran los bloques en disco con AES-GCM y requieren `DFS_STORAGE_KEY`; usa una llave distinta por nodo y protégela con un gestor de secretos. Para red remota configura además `DFS_NODE_BIND=0.0.0.0`, `DFS_NODE_TLS_CERT` y `DFS_NODE_TLS_KEY` en cada nodo, `DFS_NODE_TLS_CA` y `DFS_NODE_TLS_REQUIRED=1` en el Gateway, y un `DFS_NODE_TOKEN` compartido. Se puede habilitar autenticación mutua TLS con `DFS_NODE_CLIENT_CA` en el nodo y certificado/llave de cliente en el Gateway. Para exponer REST, configura `DFS_GATEWAY_BIND`, `DFS_GATEWAY_TLS_CERT`, `DFS_GATEWAY_TLS_KEY` y autenticación obligatoria con `DFS_USERS`; en el cliente define `DFS_GATEWAY_URL=https://...`.
+Los nodos cifran los bloques en disco con AES-GCM y requieren `DFS_STORAGE_KEY`; usa una llave distinta por nodo y protégela con un gestor de secretos. Para red remota configura además `DFS_NODE_BIND=0.0.0.0`, `DFS_NODE_TLS_CERT` y `DFS_NODE_TLS_KEY` en cada nodo, `DFS_NODE_TLS_CA` y `DFS_NODE_TLS_REQUIRED=1` en el Gateway, y un `DFS_NODE_TOKEN` compartido. Se puede habilitar autenticación mutua TLS con `DFS_NODE_CLIENT_CA` en el nodo y certificado/llave de cliente en el Gateway. Para exponer REST, configura `DFS_GATEWAY_BIND`, `DFS_GATEWAY_TLS_CERT`, `DFS_GATEWAY_TLS_KEY` y usuarios mediante `DFS_USER_PASSWORDS` o `DFS_USERS`; en el cliente define `DFS_GATEWAY_URL=https://...`.
 
-En una terminal de cliente, con el Gateway arriba:
+Para compatibilidad, la CLI aún admite un token individual configurado en `DFS_USER_TOKEN`; el flujo de sesión es el recomendado.
 
 ```powershell
 $env:DFS_DEFAULT_USER = "ana"

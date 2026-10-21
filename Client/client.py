@@ -61,6 +61,14 @@ def guardar_sesion(sesion):
 def token_para_usuario(usuario=None):
     identidad = os.getenv("DFS_DEFAULT_USER", DEFAULT_USER)
     sesion = leer_sesion()
+    token_configurado = os.getenv("DFS_USER_TOKEN")
+    if token_configurado:
+        usuario_solicitado = usuario or identidad
+        if usuario_solicitado != identidad:
+            raise ValueError(
+                f"Esta CLI está autenticada como '{identidad}' y no puede cambiar a '{usuario_solicitado}'"
+            )
+        return token_configurado
     # Los argumentos antiguos tienen ``demo`` como valor predeterminado; una
     # sesión activa debe prevalecer para que el shell no consulte al usuario anterior.
     if sesion and (usuario is None or usuario == identidad):
@@ -72,7 +80,6 @@ def token_para_usuario(usuario=None):
             f"Esta CLI está autenticada como '{identidad}' y no puede cambiar a '{usuario}'"
         )
     token = sesion.get("token") if sesion and sesion.get("usuario") == usuario else None
-    token = token or os.getenv("DFS_USER_TOKEN")
     if not token:
         raise ValueError("Define DFS_USER_TOKEN con el token individual de este usuario")
     return token
@@ -323,7 +330,7 @@ def comando_shell(args):
   get <nombre_o_id> [salida]  descarga un archivo
   rm <nombre_o_id>            elimina un archivo
   exit                        cierra el cliente""")
-            if comando == "pwd":
+            elif comando == "pwd":
                 print(actual)
             elif comando in {"ls", "list"}:
                 destino = ruta_remota(actual, valores[0] if valores else ".")

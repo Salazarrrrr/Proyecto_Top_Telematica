@@ -21,8 +21,13 @@ function New-Secret {
 
 $demoToken = New-Secret
 $usuarios = ConvertTo-Json -InputObject @{ demo = $demoToken } -Compress
+$passwords = ConvertTo-Json -InputObject @{ admin = (New-Secret); demo = (New-Secret) } -Compress
+$roles = ConvertTo-Json -InputObject @{ admin = "admin"; demo = "usuario" } -Compress
 $lines = @(
     "DFS_USERS='$usuarios'",
+    "DFS_USER_PASSWORDS='$passwords'",
+    "DFS_USER_ROLES='$roles'",
+    "DFS_AUTH_USERS_FILE=/app/metadata/usuarios.json",
     "DFS_DEFAULT_USER=demo",
     "DFS_ADMIN_TOKEN=$(New-Secret)",
     "DFS_NODE_TOKEN=$(New-Secret)",
@@ -41,3 +46,6 @@ try {
 }
 
 Write-Host "Configuración de laboratorio creada. Protege Deploy/.env y Deploy/certs/ca.key."
+Write-Host "Contraseñas iniciales (cámbialas después del primer inicio):"
+Write-Host "  admin: $($passwords | ConvertFrom-Json | Select-Object -ExpandProperty admin)"
+Write-Host "  demo:  $($passwords | ConvertFrom-Json | Select-Object -ExpandProperty demo)"

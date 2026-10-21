@@ -77,7 +77,7 @@ services:
       DFS_GATEWAY_PORT: "8000"
       DFS_GATEWAY_TLS_CERT: /run/certs/gateway.crt
       DFS_GATEWAY_TLS_KEY: /run/certs/gateway.key
-      DFS_USERS: ${DFS_USERS:?set individual user tokens in Deploy/.env}
+      DFS_USERS: ${DFS_USERS:-}
       DFS_USER_PASSWORDS: ${DFS_USER_PASSWORDS:?set initial user passwords in Deploy/.env}
       DFS_USER_ROLES: ${DFS_USER_ROLES:-{"admin":"admin","demo":"usuario"}}
       DFS_AUTH_USERS_FILE: ${DFS_AUTH_USERS_FILE:-/app/metadata/usuarios.json}
@@ -97,6 +97,11 @@ services:
       - gateway-metadata:/app/metadata
       - ./certs:/run/certs:ro
     networks: [dfsha]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8000/health', context=ssl._create_unverified_context(), timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
 networks:
   dfsha:
