@@ -57,6 +57,10 @@ def main():
         "--force", action="store_true",
         help="reemplaza solamente los certificados de laboratorio ya generados",
     )
+    parser.add_argument(
+        "--gateway-host", default="localhost",
+        help="nombre DNS o dirección IP con la que los clientes accederán al Gateway",
+    )
     args = parser.parse_args()
     destino = Path(__file__).resolve().parent / "certs"
     destino.mkdir(parents=True, exist_ok=True)
@@ -112,11 +116,15 @@ def main():
         [x509.DNSName(host) for host in ("node1", "node2", "node3", "localhost")]
         + [x509.IPAddress(ip_address("127.0.0.1"))], ahora,
     )
+    try:
+        gateway_san = x509.IPAddress(ip_address(args.gateway_host))
+    except ValueError:
+        gateway_san = x509.DNSName(args.gateway_host)
     gateway_key = crear_llave()
     gateway_cert = emitir_certificado(
-        "localhost", gateway_key.public_key(), ca_cert, ca_key,
+        args.gateway_host, gateway_key.public_key(), ca_cert, ca_key,
         [x509.DNSName("localhost"), x509.DNSName("gateway"),
-         x509.IPAddress(ip_address("127.0.0.1"))], ahora,
+         x509.IPAddress(ip_address("127.0.0.1")), gateway_san], ahora,
     )
 
     artefactos = {
