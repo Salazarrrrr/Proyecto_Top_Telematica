@@ -47,11 +47,15 @@ def main():
     host = os.getenv("DFS_GATEWAY_BIND", "127.0.0.1")
     cert_path = os.getenv("DFS_GATEWAY_TLS_CERT")
     key_path = os.getenv("DFS_GATEWAY_TLS_KEY")
+    tls_terminado = os.getenv("DFS_GATEWAY_TLS_TERMINATED", "0").lower() in {"1", "true", "yes"}
     if bool(cert_path) != bool(key_path):
         raise RuntimeError("DFS_GATEWAY_TLS_CERT y DFS_GATEWAY_TLS_KEY deben configurarse juntos")
+    if tls_terminado and (cert_path or key_path):
+        raise RuntimeError("No configures certificados en el Gateway cuando el proxy termina TLS")
     remoto = host not in {"localhost", "127.0.0.1", "::1"}
     autenticacion = os.getenv("DFS_USERS") or os.getenv("DFS_USER_PASSWORDS")
-    if remoto and (not cert_path or not key_path or not autenticacion):
+    requiere_tls_gateway = not tls_terminado and (not cert_path or not key_path)
+    if remoto and (requiere_tls_gateway or not autenticacion):
         raise RuntimeError("La exposición remota requiere HTTPS y usuarios configurados")
     app.run(
         host=host,

@@ -132,6 +132,23 @@ El factor de replicación se puede cambiar en ejecución mediante `PUT /cluster/
 
 El CLI transmite el archivo local al Gateway con multipart, por lo que el cliente y el servidor pueden estar en equipos distintos. Ofrece `store`, `get`, `list`, `ls`, `mkdir`, `rmdir` y un `shell` interactivo con `cd`, `pwd` y `rm`. Todas las solicitudes HTTP usan `Authorization: Bearer ...` cuando se configura autenticación.
 
+## Despliegue público en AWS
+
+Para que usuarios externos accedan sin instalar certificados de laboratorio, usa un dominio propio, una IP elástica de EC2 y `Deploy/compose.aws.yaml`. Caddy publica HTTPS con un certificado público y mantiene el Gateway y los nodos dentro de la red privada de Docker.
+
+1. Crea una instancia EC2 con Amazon Linux 2023, una IP elástica y un dominio que apunte mediante un registro A a esa IP. En el Security Group permite TCP 80 y 443 para los usuarios; permite SSH 22 solamente desde la IP de administración.
+2. Conéctate por SSH, instala Docker, Git y Python, clona el repositorio e instala dependencias de Python.
+3. En `Deploy/.env` configura los secretos de nodos y usuarios, además de `DFS_PUBLIC_HOST=dfs.tudominio.com`. No uses certificados de `Deploy/certs` para este modo.
+4. Inicia la plataforma con:
+
+```bash
+docker compose --env-file Deploy/.env -f Deploy/compose.yaml -f Deploy/compose.aws.yaml up --build -d
+```
+
+5. Los clientes usan `DFS_GATEWAY_URL=https://dfs.tudominio.com`, inician sesión con `python -m Client.client login <usuario>` y no necesitan definir `DFS_GATEWAY_TLS_CA`.
+
+El primer inicio requiere que el dominio ya resuelva a la IP de EC2 y que los puertos 80 y 443 estén abiertos, para que Caddy obtenga el certificado. El Gateway no se publica directamente en AWS.
+
 ## Estado y límites del prototipo
 
 El clúster exige W mayoritario y R + W > N para asegurar intersección entre quórums. Una lectura solo acepta contenido que alcance R; si hay réplicas divergentes sin un valor con quórum, falla de forma segura en vez de escoger una copia arbitraria. Al agregar un nodo, valida las copias destino antes de limpiar las réplicas fuera del anillo. El metadato del archivo solo se publica después de completar todos sus bloques, y cada escritura de bloque usa reemplazo atómico para que una lectura no vea un archivo parcialmente escrito.
