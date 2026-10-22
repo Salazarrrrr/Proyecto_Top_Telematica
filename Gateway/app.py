@@ -6,7 +6,7 @@ from pathlib import Path
 from flask import Flask, jsonify
 
 from Gateway.auth import registrar_seguridad
-from Gateway.cluster import ClusterManager
+from Gateway.cluster_comunication import ClusterManager
 from Gateway.metadata import CatalogoArchivos
 from Gateway.node_client import NodeClient
 from Gateway.routes import auth as auth_routes, blocks, cluster as cluster_routes, directories, files

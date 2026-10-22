@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from Gateway.cluster import ClusterManager
+from Gateway.cluster_comunication import ClusterManager
 
 
 class TestQuorum(unittest.TestCase):
