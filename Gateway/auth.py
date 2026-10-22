@@ -109,7 +109,7 @@ def _sesion_valida(estado, token):
 def autenticar_solicitud():
     g.usuario_autenticado = None
     g.rol = None
-    if request.path in {"/auth/login", "/health"}:
+    if request.path in {"/auth/login", "/auth/register", "/health"}:
         return None
     estado = current_app.extensions["auth"]
     recibido = request.headers.get("Authorization", "")
@@ -223,6 +223,11 @@ def crear_usuario(usuario, password, rol):
         estado["usuarios"][usuario] = {"password": _hash_password(password), "rol": rol}
         guardar_usuarios(estado)
     return usuario
+
+
+def registrar_usuario(usuario, password):
+    """Registro público: nunca permite elegir ni elevar privilegios."""
+    return crear_usuario(usuario, password, "usuario")
 
 
 def bloquear_operacion_archivo(funcion):

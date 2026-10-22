@@ -134,6 +134,18 @@ class TestSesionesYRoles(unittest.TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta.json["servicio"], "gateway")
 
+    def test_registro_publico_solo_crea_usuarios_normales(self):
+        creado = self.cliente.post("/auth/register", json={
+            "usuario": "nueva", "password": "Password1!", "rol": "admin",
+        })
+        self.assertEqual(creado.status_code, 201)
+        self.assertEqual(creado.json["rol"], "usuario")
+        sesion = self.cliente.post("/auth/login", json={
+            "usuario": "nueva", "password": "Password1!",
+        })
+        self.assertEqual(sesion.status_code, 200)
+        self.assertEqual(sesion.json["rol"], "usuario")
+
 
 if __name__ == "__main__":
     unittest.main()

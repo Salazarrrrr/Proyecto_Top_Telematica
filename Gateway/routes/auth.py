@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, request, g
 
-from Gateway.auth import autorizar_administrador, cerrar_sesion, crear_usuario, iniciar_sesion
+from Gateway.auth import (
+    autorizar_administrador, cerrar_sesion, crear_usuario, iniciar_sesion, registrar_usuario,
+)
 
 bp = Blueprint("auth", __name__)
 
@@ -16,6 +18,17 @@ def login():
     if not sesion:
         return jsonify({"exito": False, "mensaje": "Usuario o contraseña incorrectos"}), 401
     return jsonify({"exito": True, **sesion})
+
+
+@bp.post("/auth/register")
+def register():
+    """Crea exclusivamente cuentas con rol usuario."""
+    datos = request.get_json(silent=True) or {}
+    try:
+        usuario = registrar_usuario(datos.get("usuario"), datos.get("password"))
+    except ValueError as error:
+        return jsonify({"exito": False, "mensaje": str(error)}), 400
+    return jsonify({"exito": True, "usuario": usuario, "rol": "usuario"}), 201
 
 
 @bp.post("/auth/logout")

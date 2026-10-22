@@ -1,5 +1,6 @@
 .http-forge/
 Deploy/.env
+Deploy/aws/
 Deploy/certs/*
 !Deploy/certs/.gitignore
 __pycache__/

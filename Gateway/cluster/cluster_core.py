@@ -9,6 +9,7 @@ from pathlib import Path
 import grpc
 
 from Gateway.node_client import NodeClient
+from Gateway.java_cluster_client import JavaClusterClient
 
 
 class ClusterCore:
@@ -38,6 +39,7 @@ class ClusterCore:
         self._validar_quorums(self.factor_replicacion)
         self.timeout = timeout
         self.clientes = {direccion: NodeClient(direccion) for direccion in self.direcciones}
+        self.java_cluster = JavaClusterClient(timeout=timeout)
         self._lock = threading.RLock()
         self._ultimo_heartbeat = {}
         self._capacidades = {}
@@ -94,6 +96,11 @@ class ClusterCore:
         nodos = self._miembros_activos
         if nodos is None:
             nodos = self.direcciones
+        asignados_java = self.java_cluster.responsables(
+            block_id, nodos, self.factor_replicacion
+        )
+        if asignados_java is not None:
+            return asignados_java
         posicion = self._hash(block_id)
         ordenados = sorted(
             nodos,

@@ -15,6 +15,7 @@ def estado_cluster():
         "factor_replicacion": servicios()["cluster"].factor_replicacion,
         "quorum_lectura": servicios()["cluster"].quorum_lectura,
         "quorum_escritura": servicios()["cluster"].quorum_escritura,
+        "asignador": "java" if servicios()["cluster"].java_cluster.activo else "python",
         "membresia": membresia,
     })
 

@@ -1,0 +1,75 @@
+services:
+  cluster-java:
+    build:
+      context: ../Cluster
+    restart: unless-stopped
+    networks: [dfsha]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  gateway:
+    build:
+      context: ..
+    command: ["python", "-m", "Gateway.app"]
+    restart: unless-stopped
+    environment:
+      DFS_GATEWAY_BIND: 0.0.0.0
+      DFS_GATEWAY_PORT: "8000"
+      DFS_GATEWAY_TLS_CERT: ""
+      DFS_GATEWAY_TLS_KEY: ""
+      DFS_GATEWAY_TLS_TERMINATED: "1"
+      DFS_USER_PASSWORDS: ${DFS_USER_PASSWORDS:?set initial user passwords in Deploy/.env}
+      DFS_USER_ROLES: ${DFS_USER_ROLES:?set user roles in Deploy/.env}
+      DFS_AUTH_USERS_FILE: /app/metadata/usuarios.json
+      DFS_ADMIN_TOKEN: ${DFS_ADMIN_TOKEN:?set an admin token in Deploy/.env}
+      DFS_NODE_TOKEN: ${DFS_NODE_TOKEN:?set DFS_NODE_TOKEN in Deploy/.env}
+      DFS_NODE_TLS_CA: /run/certs/ca.crt
+      DFS_CLUSTER_JAVA_URL: http://cluster-java:8081
+      DFS_NODE_TLS_REQUIRED: "1"
+      DFS_NODE_TLS_SERVER_NAME: node1
+      DFS_NODES: ${DFS_NODES:?set the three private node addresses in Deploy/.env}
+      DFS_REPLICATION_FACTOR: "3"
+      DFS_READ_QUORUM: "2"
+      DFS_WRITE_QUORUM: "2"
+      DFS_BLOCK_SIZE: "67108864"
+      DFS_MAX_UPLOAD_BYTES: "1073741824"
+    volumes:
+      - gateway-metadata:/app/metadata
+      - ./certs:/run/certs:ro
+    networks: [dfsha]
+    depends_on:
+      cluster-java:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      DFS_PUBLIC_HOST: ${DFS_PUBLIC_HOST:?set the public domain in Deploy/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [dfsha]
+
+networks:
+  dfsha:
+
+volumes:
+  gateway-metadata:
+  caddy-data:
+  caddy-config:

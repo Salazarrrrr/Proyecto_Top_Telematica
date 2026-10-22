@@ -6,13 +6,30 @@ import os
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 from Gateway.cluster import ClusterManager
 
 
 class TestQuorum(unittest.TestCase):
+    def test_asignacion_de_bloque_consulta_servicio_java(self):
+        with patch.dict(os.environ, {"DFS_CLUSTER_JAVA_URL": "http://cluster-java:8081"}), \
+             patch("Gateway.cluster.cluster_core.NodeClient") as cliente:
+            cliente.return_value.canal = SimpleNamespace(close=lambda: None)
+            cluster = ClusterManager(
+                nodos="nodo-a:1,nodo-b:2,nodo-c:3", factor_replicacion=2,
+                quorum_lectura=1, quorum_escritura=2,
+            )
+            try:
+                cluster.java_cluster.responsables = MagicMock(return_value=["nodo-c:3", "nodo-a:1"])
+                self.assertEqual(cluster.nodos_responsables("archivo-0"), ["nodo-c:3", "nodo-a:1"])
+                cluster.java_cluster.responsables.assert_called_once_with(
+                    "archivo-0", ["nodo-a:1", "nodo-b:2", "nodo-c:3"], 2
+                )
+            finally:
+                cluster.cerrar()
+
     def test_factor_se_conserva_al_reiniciar_el_gateway(self):
         with tempfile.TemporaryDirectory() as directorio, patch.dict(
             os.environ, {"DFS_CLUSTER_CONFIG": os.path.join(directorio, "cluster.json")}

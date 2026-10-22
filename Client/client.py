@@ -94,6 +94,17 @@ def comando_login(args):
     print(f"Sesión iniciada como {respuesta['usuario']} ({respuesta['rol']}).")
 
 
+def comando_register(args):
+    password = args.password or getpass.getpass("Contraseña: ")
+    confirmacion = args.password or getpass.getpass("Confirma la contraseña: ")
+    if password != confirmacion:
+        raise ValueError("Las contraseñas no coinciden")
+    respuesta = solicitar_sin_autenticacion("POST", "/auth/register", {
+        "usuario": args.usuario, "password": password,
+    })
+    print(f"Usuario registrado: {respuesta['usuario']} ({respuesta['rol']}). Ahora usa login.")
+
+
 def solicitar_sin_autenticacion(method, path, datos=None):
     cuerpo = json.dumps(datos).encode("utf-8") if datos is not None else None
     headers = {"Accept": "application/json"}
@@ -375,6 +386,11 @@ def crear_parser():
     login.add_argument("usuario", nargs="?", default=DEFAULT_USER)
     login.add_argument("--password")
     login.set_defaults(func=comando_login)
+
+    register = subparsers.add_parser("register", aliases=["registro"], help="crea una cuenta de usuario")
+    register.add_argument("usuario")
+    register.add_argument("--password")
+    register.set_defaults(func=comando_register)
 
     logout = subparsers.add_parser("logout", help="cierra la sesión actual")
     logout.set_defaults(func=comando_logout)

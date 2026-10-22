@@ -8,7 +8,7 @@ Prototipo de sistema de archivos distribuido con acceso Cliente/Servidor por RES
 - `Gateway`: API Flask, catálogo de archivos, asignación de nodos, quórums y operaciones de membresía.
 - `Node`: servicio gRPC de bloques con escritura atómica y verificación de integridad.
 - `Proto`: contrato gRPC compartido.
-- `Cluster`: implementación Java de referencia para el anillo hash; el Gateway Python es el coordinador que usa el prototipo actual.
+- `Cluster`: servicio Java que implementa el anillo de hashing consistente y decide los nodos responsables de cada bloque.
 
 ## Requisitos y ejecución local
 
@@ -94,7 +94,7 @@ $env:DFS_DEFAULT_USER = "demo"
 & .\.venv\Scripts\python.exe -m Client.client logout
 ```
 
-Solo una sesión con rol `admin` puede crear usuarios mediante `POST /auth/users`; los usuarios normales únicamente acceden a sus propios archivos. `POST /auth/login`, `POST /auth/logout` y `GET /auth/me` completan el ciclo de sesión.
+Una persona nueva puede crear su propia cuenta mediante `POST /auth/register` o `python -m Client.client register <usuario>`; este registro siempre asigna el rol `usuario`. Solo una sesión con rol `admin` puede crear cuentas administrativas mediante `POST /auth/users`; los usuarios normales únicamente acceden a sus propios archivos. `POST /auth/login`, `POST /auth/logout` y `GET /auth/me` completan el ciclo de sesión.
 
 Los nodos escuchan solo en `127.0.0.1` por defecto. Las rutas de diagnóstico `/blocks` están desactivadas si no configuras `DFS_ADMIN_TOKEN` y requieren ese token aparte. `GET /health` no requiere autenticación y permite que Docker o un balanceador comprueben la disponibilidad del Gateway.
 
@@ -123,11 +123,12 @@ El factor de replicación se puede cambiar en ejecución mediante `PUT /cluster/
 - `POST /directories` con `{"path":"/docs"}` y `DELETE /directories?path=/docs`: crea o elimina directorios vacíos.
 - `GET /files/<file_id>?usuario=...`: reconstruye y entrega el archivo en streaming binario.
 - `DELETE /files/<file_id>?usuario=...`: elimina los bloques y los metadatos.
-- `GET /cluster`: informa nodos, estado de disponibilidad, N, R y W.
+- `GET /cluster`: informa nodos, estado de disponibilidad, N, R, W y el asignador activo (`java` en el despliegue).
 - `POST /cluster/rebalance`: registra un nodo, distribuye las réplicas según el anillo actualizado y reporta cualquier limpieza pendiente.
 - `DELETE /cluster/nodes/<direccion>`: salida controlada; migra los bloques antes de retirar el nodo.
 - `PUT /cluster/replication` con `{"factor": N}`: ajusta N y confirma primero las copias destino; reporta y reintenta la limpieza de excedentes si un nodo no está disponible.
 - `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`: ciclo de vida de sesiones.
+- `POST /auth/register` con `{"usuario":"...","password":"..."}`: registro público con rol fijo `usuario`.
 - `POST /auth/users` con `{"usuario":"...","password":"...","rol":"usuario|admin"}`: creación restringida a administradores.
 
 El CLI transmite el archivo local al Gateway con multipart, por lo que el cliente y el servidor pueden estar en equipos distintos. Ofrece `store`, `get`, `list`, `ls`, `mkdir`, `rmdir` y un `shell` interactivo con `cd`, `pwd` y `rm`. Todas las solicitudes HTTP usan `Authorization: Bearer ...` cuando se configura autenticación.
@@ -153,7 +154,7 @@ El primer inicio requiere que el dominio ya resuelva a la IP de EC2 y que los pu
 
 El clúster exige W mayoritario y R + W > N para asegurar intersección entre quórums. Una lectura solo acepta contenido que alcance R; si hay réplicas divergentes sin un valor con quórum, falla de forma segura en vez de escoger una copia arbitraria. Al agregar un nodo, valida las copias destino antes de limpiar las réplicas fuera del anillo. El metadato del archivo solo se publica después de completar todos sus bloques, y cada escritura de bloque usa reemplazo atómico para que una lectura no vea un archivo parcialmente escrito.
 
-El Gateway hace heartbeats gRPC cada cinco segundos, actualiza la membresía y difunde su vista a los nodos. La capacidad libre se consulta en cada heartbeat. Al cambiar la membresía, el Gateway intenta recuperar las réplicas que aún cumplen R y W y limpia copias que quedaron fuera del anillo. Para despliegues remotos, activa TLS en gRPC y HTTPS en REST con certificados confiables.
+El servicio Java calcula los responsables de cada bloque mediante hashing consistente. El Gateway consulta ese servicio antes de cada escritura, lectura, rebalanceo o recuperación de réplicas; después realiza los heartbeats gRPC, actualiza la membresía y coordina las operaciones de bloques. La capacidad libre se consulta en cada heartbeat. Al cambiar la membresía, el Gateway intenta recuperar las réplicas que aún cumplen R y W y limpia copias que quedaron fuera del anillo. Para despliegues remotos, activa TLS en gRPC y HTTPS en REST con certificados confiables.
 
 Siguen pendientes la tolerancia a la caída del propio Gateway y la replicación del catálogo: esta versión usa coordinación central y un catálogo JSON local. Tampoco implementa acceso aleatorio con `open/read/write/lock` ni un montaje transparente como sistema de archivos del sistema operativo; ofrece transferencia de archivos y gestión de directorios por CLI/API.
 

@@ -28,7 +28,9 @@ class NodeClient:
                 private_key=_leer_certificado(clave),
                 certificate_chain=_leer_certificado(certificado),
             )
-            self.canal = grpc.secure_channel(direccion, credenciales)
+            nombre_tls = os.getenv("DFS_NODE_TLS_SERVER_NAME")
+            opciones = (("grpc.ssl_target_name_override", nombre_tls),) if nombre_tls else ()
+            self.canal = grpc.secure_channel(direccion, credenciales, options=opciones)
         elif tls_requerido:
             raise RuntimeError("DFS_NODE_TLS_CA es obligatorio porque se requiere TLS")
         else:
