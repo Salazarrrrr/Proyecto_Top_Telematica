@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bProto/bloque_servicio.proto\x12\x05\x64\x66sha\"(\n\x10HeartbeatRequest\x12\x14\n\x0crequester_id\x18\x01 \x01(\t\"\x87\x01\n\x11HeartbeatResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07node_id\x18\x02 \x01(\t\x12\x0e\n\x06\x65stado\x18\x03 \x01(\t\x12\x1e\n\x16last_heartbeat_unix_ms\x18\x04 \x01(\x03\x12\"\n\x1a\x63\x61pacidad_disponible_bytes\x18\x05 \x01(\x03\"\xa6\x01\n\rNodoMembresia\x12\x0f\n\x07node_id\x18\x01 \x01(\t\x12\x11\n\tdireccion\x18\x02 \x01(\t\x12\x0e\n\x06puerto\x18\x03 \x01(\x05\x12\x0e\n\x06\x65stado\x18\x04 \x01(\t\x12\x15\n\rhash_position\x18\x05 \x01(\t\x12\x16\n\x0elast_heartbeat\x18\x06 \x01(\t\x12\"\n\x1a\x63\x61pacidad_disponible_bytes\x18\x07 \x01(\x03\"A\n\x1a\x41\x63tualizarMembresiaRequest\x12#\n\x05nodos\x18\x01 \x03(\x0b\x32\x14.dfsha.NodoMembresia\">\n\x1b\x41\x63tualizarMembresiaResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x10\n\x08miembros\x18\x02 \x01(\r\"q\n\x15\x45scribirBloqueRequest\x12\x10\n\x08\x62lock_id\x18\x01 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x02 \x01(\t\x12\x10\n\x08posicion\x18\x03 \x01(\x05\x12\x11\n\tcontenido\x18\x04 \x01(\x0c\x12\x10\n\x08\x63hecksum\x18\x05 \x01(\t\"J\n\x16\x45scribirBloqueResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07mensaje\x18\x02 \x01(\t\x12\x10\n\x08\x62lock_id\x18\x03 \x01(\t\"%\n\x11LeerBloqueRequest\x12\x10\n\x08\x62lock_id\x18\x01 \x01(\t\"\x8e\x01\n\x12LeerBloqueResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07mensaje\x18\x02 \x01(\t\x12\x10\n\x08\x62lock_id\x18\x03 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x04 \x01(\t\x12\x10\n\x08posicion\x18\x05 \x01(\x05\x12\x11\n\tcontenido\x18\x06 \x01(\x0c\x12\x10\n\x08\x63hecksum\x18\x07 \x01(\t\")\n\x15\x45liminarBloqueRequest\x12\x10\n\x08\x62lock_id\x18\x01 \x01(\t\"8\n\x16\x45liminarBloqueResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07mensaje\x18\x02 \x01(\t2\x8f\x03\n\x0e\x42loqueServicio\x12M\n\x0e\x45scribirBloque\x12\x1c.dfsha.EscribirBloqueRequest\x1a\x1d.dfsha.EscribirBloqueResponse\x12\x41\n\nLeerBloque\x12\x18.dfsha.LeerBloqueRequest\x1a\x19.dfsha.LeerBloqueResponse\x12M\n\x0e\x45liminarBloque\x12\x1c.dfsha.EliminarBloqueRequest\x1a\x1d.dfsha.EliminarBloqueResponse\x12>\n\tHeartbeat\x12\x17.dfsha.HeartbeatRequest\x1a\x18.dfsha.HeartbeatResponse\x12\\\n\x13\x41\x63tualizarMembresia\x12!.dfsha.ActualizarMembresiaRequest\x1a\".dfsha.ActualizarMembresiaResponseB\t\n\x05\x64\x66shaP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bProto/bloque_servicio.proto\x12\x05\x64\x66sha\"(\n\x10HeartbeatRequest\x12\x14\n\x0crequester_id\x18\x01 \x01(\t\"\x87\x01\n\x11HeartbeatResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07node_id\x18\x02 \x01(\t\x12\x0e\n\x06\x65stado\x18\x03 \x01(\t\x12\x1e\n\x16last_heartbeat_unix_ms\x18\x04 \x01(\x03\x12\"\n\x1a\x63\x61pacidad_disponible_bytes\x18\x05 \x01(\x03\"\xa6\x01\n\rNodoMembresia\x12\x0f\n\x07node_id\x18\x01 \x01(\t\x12\x11\n\tdireccion\x18\x02 \x01(\t\x12\x0e\n\x06puerto\x18\x03 \x01(\x05\x12\x0e\n\x06\x65stado\x18\x04 \x01(\t\x12\x15\n\rhash_position\x18\x05 \x01(\t\x12\x16\n\x0elast_heartbeat\x18\x06 \x01(\t\x12\"\n\x1a\x63\x61pacidad_disponible_bytes\x18\x07 \x01(\x03\"A\n\x1a\x41\x63tualizarMembresiaRequest\x12#\n\x05nodos\x18\x01 \x03(\x0b\x32\x14.dfsha.NodoMembresia\">\n\x1b\x41\x63tualizarMembresiaResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x10\n\x08miembros\x18\x02 \x01(\r\"q\n\x15\x45scribirBloqueRequest\x12\x10\n\x08\x62lock_id\x18\x01 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x02 \x01(\t\x12\x10\n\x08posicion\x18\x03 \x01(\x05\x12\x11\n\tcontenido\x18\x04 \x01(\x0c\x12\x10\n\x08\x63hecksum\x18\x05 \x01(\t\"J\n\x16\x45scribirBloqueResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07mensaje\x18\x02 \x01(\t\x12\x10\n\x08\x62lock_id\x18\x03 \x01(\t\"\x83\x01\n\x15ReplicarBloqueRequest\x12\x10\n\x08\x62lock_id\x18\x01 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x02 \x01(\t\x12\x10\n\x08posicion\x18\x03 \x01(\x05\x12\x11\n\tcontenido\x18\x04 \x01(\x0c\x12\x10\n\x08\x63hecksum\x18\x05 \x01(\t\x12\x10\n\x08\x64\x65stinos\x18\x06 \x03(\t\"V\n\x16ReplicarBloqueResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x1c\n\x14replicas_confirmadas\x18\x02 \x01(\r\x12\x0f\n\x07mensaje\x18\x03 \x01(\t\"%\n\x11LeerBloqueRequest\x12\x10\n\x08\x62lock_id\x18\x01 \x01(\t\"\x8e\x01\n\x12LeerBloqueResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07mensaje\x18\x02 \x01(\t\x12\x10\n\x08\x62lock_id\x18\x03 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x04 \x01(\t\x12\x10\n\x08posicion\x18\x05 \x01(\x05\x12\x11\n\tcontenido\x18\x06 \x01(\x0c\x12\x10\n\x08\x63hecksum\x18\x07 \x01(\t\")\n\x15\x45liminarBloqueRequest\x12\x10\n\x08\x62lock_id\x18\x01 \x01(\t\"8\n\x16\x45liminarBloqueResponse\x12\r\n\x05\x65xito\x18\x01 \x01(\x08\x12\x0f\n\x07mensaje\x18\x02 \x01(\t2\xde\x03\n\x0e\x42loqueServicio\x12M\n\x0e\x45scribirBloque\x12\x1c.dfsha.EscribirBloqueRequest\x1a\x1d.dfsha.EscribirBloqueResponse\x12M\n\x0eReplicarBloque\x12\x1c.dfsha.ReplicarBloqueRequest\x1a\x1d.dfsha.ReplicarBloqueResponse\x12\x41\n\nLeerBloque\x12\x18.dfsha.LeerBloqueRequest\x1a\x19.dfsha.LeerBloqueResponse\x12M\n\x0e\x45liminarBloque\x12\x1c.dfsha.EliminarBloqueRequest\x1a\x1d.dfsha.EliminarBloqueResponse\x12>\n\tHeartbeat\x12\x17.dfsha.HeartbeatRequest\x1a\x18.dfsha.HeartbeatResponse\x12\\\n\x13\x41\x63tualizarMembresia\x12!.dfsha.ActualizarMembresiaRequest\x1a\".dfsha.ActualizarMembresiaResponseB\t\n\x05\x64\x66shaP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -46,14 +46,18 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ESCRIBIRBLOQUEREQUEST']._serialized_end=631
   _globals['_ESCRIBIRBLOQUERESPONSE']._serialized_start=633
   _globals['_ESCRIBIRBLOQUERESPONSE']._serialized_end=707
-  _globals['_LEERBLOQUEREQUEST']._serialized_start=709
-  _globals['_LEERBLOQUEREQUEST']._serialized_end=746
-  _globals['_LEERBLOQUERESPONSE']._serialized_start=749
-  _globals['_LEERBLOQUERESPONSE']._serialized_end=891
-  _globals['_ELIMINARBLOQUEREQUEST']._serialized_start=893
-  _globals['_ELIMINARBLOQUEREQUEST']._serialized_end=934
-  _globals['_ELIMINARBLOQUERESPONSE']._serialized_start=936
-  _globals['_ELIMINARBLOQUERESPONSE']._serialized_end=992
-  _globals['_BLOQUESERVICIO']._serialized_start=995
-  _globals['_BLOQUESERVICIO']._serialized_end=1394
+  _globals['_REPLICARBLOQUEREQUEST']._serialized_start=710
+  _globals['_REPLICARBLOQUEREQUEST']._serialized_end=841
+  _globals['_REPLICARBLOQUERESPONSE']._serialized_start=843
+  _globals['_REPLICARBLOQUERESPONSE']._serialized_end=929
+  _globals['_LEERBLOQUEREQUEST']._serialized_start=931
+  _globals['_LEERBLOQUEREQUEST']._serialized_end=968
+  _globals['_LEERBLOQUERESPONSE']._serialized_start=971
+  _globals['_LEERBLOQUERESPONSE']._serialized_end=1113
+  _globals['_ELIMINARBLOQUEREQUEST']._serialized_start=1115
+  _globals['_ELIMINARBLOQUEREQUEST']._serialized_end=1156
+  _globals['_ELIMINARBLOQUERESPONSE']._serialized_start=1158
+  _globals['_ELIMINARBLOQUERESPONSE']._serialized_end=1214
+  _globals['_BLOQUESERVICIO']._serialized_start=1217
+  _globals['_BLOQUESERVICIO']._serialized_end=1695
 # @@protoc_insertion_point(module_scope)

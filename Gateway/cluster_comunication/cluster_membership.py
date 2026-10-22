@@ -101,25 +101,24 @@ class MembershipOperations:
 
         era_miembro = direccion in self.clientes
         self.agregar_nodo(direccion)
+        self.difundir_membresia()
         guardados = 0
         plan_limpieza = []
         try:
             for archivo, bloque, contenido in contenido_bloques:
                 responsables = self.nodos_responsables(bloque["block_id"])
-                confirmaciones = 0
-                for destino in responsables:
-                    try:
-                        ack = self._invocar(
-                            destino, "escribir_bloque", bloque["block_id"], archivo["file_id"],
-                            bloque["posicion"], contenido, bloque["checksum"],
-                        )
-                        confirmaciones += int(ack.exito)
-                    except grpc.RpcError:
-                        continue
-                if confirmaciones < self.quorum_escritura:
+                exito, confirmaciones, mensaje = self._escribir_en_destinos(
+                    responsables,
+                    bloque["block_id"],
+                    archivo["file_id"],
+                    bloque["posicion"],
+                    contenido,
+                    bloque["checksum"],
+                )
+                if not exito:
                     raise RuntimeError(
                         f"No se alcanzó W al rebalancear {bloque['block_id']}: "
-                        f"{confirmaciones}/{self.quorum_escritura}"
+                        f"{confirmaciones}/{self.quorum_escritura}. {mensaje}"
                     )
                 guardados += confirmaciones
                 plan_limpieza.append((

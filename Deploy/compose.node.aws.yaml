@@ -10,6 +10,10 @@ services:
       DFS_NODE_ID: ${DFS_NODE_ID:?set this node private IP followed by :50051}
       DFS_NODE_TLS_CERT: /run/certs/nodes.crt
       DFS_NODE_TLS_KEY: /run/certs/nodes.key
+      DFS_NODE_TLS_CA: /run/certs/ca.crt
+      DFS_NODE_TLS_REQUIRED: "1"
+      DFS_NODE_TLS_SERVER_NAME: node1
+      DFS_NODE_PEER_TIMEOUT: "10"
       DFS_NODE_TOKEN: ${DFS_NODE_TOKEN:?set the shared internal token in Deploy/.env}
       DFS_STORAGE_KEY: ${DFS_STORAGE_KEY:?set a unique base64 AES-256 key in Deploy/.env}
       DFS_NODE_STORAGE: /var/lib/dfsha

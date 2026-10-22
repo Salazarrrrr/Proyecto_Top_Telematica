@@ -30,6 +30,7 @@ services:
       DFS_CLUSTER_JAVA_URL: http://cluster-java:8081
       DFS_NODE_TLS_REQUIRED: "1"
       DFS_NODE_TLS_SERVER_NAME: node1
+      DFS_NODE_PEER_TIMEOUT: "10"
       DFS_NODES: ${DFS_NODES:?set the three private node addresses in Deploy/.env}
       DFS_REPLICATION_FACTOR: "3"
       DFS_READ_QUORUM: "2"

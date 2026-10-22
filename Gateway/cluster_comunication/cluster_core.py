@@ -10,6 +10,7 @@ import grpc
 
 from Gateway.node_client import NodeClient
 from Gateway.java_cluster_client import JavaClusterClient
+from Node.client import peer_timeout_seconds
 
 
 class ClusterCore:
@@ -38,6 +39,7 @@ class ClusterCore:
         ))
         self._validar_quorums(self.factor_replicacion)
         self.timeout = timeout
+        self.timeout_replica = peer_timeout_seconds()
         self.clientes = {direccion: NodeClient(direccion) for direccion in self.direcciones}
         self.java_cluster = JavaClusterClient(timeout=timeout)
         self._lock = threading.RLock()
@@ -111,39 +113,69 @@ class ClusterCore:
     def _invocar(self, direccion, operacion, *args):
         return getattr(self.clientes[direccion], operacion)(*args, timeout=self.timeout)
 
-    def escribir_bloque(self, block_id, file_id, posicion, contenido, checksum):
-        exitos = 0
-        errores = []
-        destinos = self.nodos_responsables(block_id)
+    def _escribir_en_destinos(
+        self, destinos, block_id, file_id, posicion, contenido, checksum
+    ):
+        destinos = list(dict.fromkeys(destinos))
         if not destinos:
-            return False, "No hay nodos registrados en el clúster"
-        for direccion in destinos:
-            try:
-                respuesta = self._invocar(
-                    direccion, "escribir_bloque", block_id, file_id, posicion, contenido, checksum
-                )
-                if respuesta.exito:
-                    exitos += 1
-                else:
-                    errores.append(f"{direccion}: {respuesta.mensaje}")
-            except grpc.RpcError as error:
-                errores.append(f"{direccion}: {error.code().name}")
+            return False, 0, "No hay nodos registrados en el clúster"
 
-        quorum = self.quorum_escritura
-        if exitos < quorum:
-            return False, (
-                f"Quórum de escritura no alcanzado: {exitos}/{quorum} réplica(s). "
-                + "; ".join(errores)
-            ).strip()
-        return True, f"Bloque confirmado en {exitos} nodo(s); quórum W={quorum} alcanzado"
+        max_confirmaciones = 0
+        errores = []
+        for coordinador in destinos:
+            replicas = [direccion for direccion in destinos if direccion != coordinador]
+            try:
+                respuesta = self.clientes[coordinador].replicar_bloque(
+                    block_id,
+                    file_id,
+                    posicion,
+                    contenido,
+                    checksum,
+                    replicas,
+                    timeout=(
+                        self.timeout
+                        + self.timeout_replica * max(1, len(destinos) - 1)
+                    ),
+                )
+                confirmaciones = respuesta.replicas_confirmadas
+                max_confirmaciones = max(max_confirmaciones, confirmaciones)
+                if confirmaciones >= self.quorum_escritura:
+                    return (
+                        True,
+                        confirmaciones,
+                        f"Bloque confirmado en {confirmaciones} nodo(s); "
+                        f"quórum W={self.quorum_escritura} alcanzado",
+                    )
+                errores.append(f"{coordinador}: {respuesta.mensaje}")
+            except grpc.RpcError as error:
+                errores.append(f"{coordinador}: {error.code().name}")
+
+        mensaje = (
+            f"Quórum de escritura no alcanzado: "
+            f"{max_confirmaciones}/{self.quorum_escritura} réplica(s)."
+        )
+        if errores:
+            mensaje += " " + "; ".join(errores)
+        return False, max_confirmaciones, mensaje
+
+    def escribir_bloque(self, block_id, file_id, posicion, contenido, checksum):
+        exito, _, mensaje = self._escribir_en_destinos(
+            self.nodos_responsables(block_id),
+            block_id,
+            file_id,
+            posicion,
+            contenido,
+            checksum,
+        )
+        return exito, mensaje
 
     def leer_bloque(self, block_id):
         respuestas = []
         errores = []
-        destinos = list(self._miembros_activos if self._miembros_activos is not None else self.direcciones)
+        destinos = self.nodos_responsables(block_id)
         if not destinos:
             return None
-        for direccion in self.nodos_responsables(block_id):
+        for direccion in destinos:
             try:
                 respuesta = self._invocar(direccion, "leer_bloque", block_id)
                 if respuesta.exito:
@@ -173,16 +205,12 @@ class ClusterCore:
         _, respuesta_valida = next(
             (par for par in respuestas if (par[1].checksum, par[1].contenido) == firma_ganadora)
         )
-        for direccion in destinos:
-            if any(d == direccion and (r.checksum, r.contenido) == firma_ganadora
-                   for d, r in respuestas):
-                continue
-            try:
-                self._invocar(
-                    direccion, "escribir_bloque", block_id, respuesta_valida.file_id,
-                    respuesta_valida.posicion, respuesta_valida.contenido,
-                    respuesta_valida.checksum,
-                )
-            except grpc.RpcError:
-                pass
+        self._escribir_en_destinos(
+            destinos,
+            block_id,
+            respuesta_valida.file_id,
+            respuesta_valida.posicion,
+            respuesta_valida.contenido,
+            respuesta_valida.checksum,
+        )
         return respuesta_valida

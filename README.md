@@ -17,7 +17,9 @@ Instala las dependencias Python en un entorno virtual con `pip install -r requir
 Para ejecutar las pruebas automáticas:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest Gateway.test_archivos Gateway.test_cluster Gateway.test_auth Client.test_client_security -v
+.\.venv\Scripts\python.exe -m unittest discover -s Tests/Gateway -p "test_*.py" -v
+.\.venv\Scripts\python.exe -m unittest discover -s Tests/Client -p "test_*.py" -v
+.\.venv\Scripts\python.exe -m unittest discover -s Tests/Node -p "test_*.py" -v
 ```
 
 Para una demostración reproducible con contenedores, ejecuta `Deploy/configurar_entorno.ps1`, que genera secretos locales ignorados por Git y certificados de laboratorio. Luego inicia el clúster con `docker compose --env-file Deploy/.env -f Deploy/compose.yaml up --build -d`. El Gateway queda en `https://localhost:8443`; configura el cliente con `DFS_GATEWAY_URL=https://localhost:8443` y `DFS_GATEWAY_TLS_CA=<ruta absoluta a Deploy/certs/ca.crt>`. El certificado/CA generado es solo para el laboratorio. No subas `Deploy/.env` ni `Deploy/certs` al repositorio.
@@ -98,7 +100,9 @@ Una persona nueva puede crear su propia cuenta mediante `POST /auth/register` o 
 
 Los nodos escuchan solo en `127.0.0.1` por defecto. Las rutas de diagnóstico `/blocks` están desactivadas si no configuras `DFS_ADMIN_TOKEN` y requieren ese token aparte. `GET /health` no requiere autenticación y permite que Docker o un balanceador comprueben la disponibilidad del Gateway.
 
-Los nodos cifran los bloques en disco con AES-GCM y requieren `DFS_STORAGE_KEY`; usa una llave distinta por nodo y protégela con un gestor de secretos. Para red remota configura además `DFS_NODE_BIND=0.0.0.0`, `DFS_NODE_TLS_CERT` y `DFS_NODE_TLS_KEY` en cada nodo, `DFS_NODE_TLS_CA` y `DFS_NODE_TLS_REQUIRED=1` en el Gateway, y un `DFS_NODE_TOKEN` compartido. Se puede habilitar autenticación mutua TLS con `DFS_NODE_CLIENT_CA` en el nodo y certificado/llave de cliente en el Gateway. Para exponer REST, configura `DFS_GATEWAY_BIND`, `DFS_GATEWAY_TLS_CERT`, `DFS_GATEWAY_TLS_KEY` y usuarios mediante `DFS_USER_PASSWORDS` o `DFS_USERS`; en el cliente define `DFS_GATEWAY_URL=https://...`.
+En una escritura, el Gateway calcula los nodos responsables y llama a `ReplicarBloque` en uno de ellos. Ese nodo guarda su copia y envía el bloque directamente a los demás responsables mediante gRPC; el Gateway confirma la operación según el quórum W. La transferencia de réplicas es nodo-a-nodo, pero la selección de destinos, membresía y coordinación siguen a cargo del Gateway: esto no convierte el clúster en una DHT ni elimina el punto central de coordinación.
+
+Los nodos cifran los bloques en disco con AES-GCM y requieren `DFS_STORAGE_KEY`; usa una llave distinta por nodo y protégela con un gestor de secretos. Para la replicación directa entre nodos, cada nodo también necesita `DFS_NODE_TLS_CA`, `DFS_NODE_TLS_REQUIRED=1`, el nombre TLS esperado en `DFS_NODE_TLS_SERVER_NAME` y acceso de red a los demás nodos. Para red remota configura además `DFS_NODE_BIND=0.0.0.0`, `DFS_NODE_TLS_CERT` y `DFS_NODE_TLS_KEY` en cada nodo, `DFS_NODE_TLS_CA` y `DFS_NODE_TLS_REQUIRED=1` en el Gateway, y un `DFS_NODE_TOKEN` compartido. El límite gRPC `DFS_GRPC_MAX_MESSAGE_BYTES` predetermina 65 MiB y debe ser mayor que el tamaño máximo de bloque más el encabezado del protocolo. `DFS_NODE_PEER_TIMEOUT` predetermina 10 segundos por llamada de un nodo a su réplica y debe configurarse igual en Gateway y nodos. Se puede habilitar autenticación mutua TLS con `DFS_NODE_CLIENT_CA` en los nodos y certificados/llaves de cliente en cada Gateway y nodo que realice llamadas gRPC. Para exponer REST, configura `DFS_GATEWAY_BIND`, `DFS_GATEWAY_TLS_CERT`, `DFS_GATEWAY_TLS_KEY` y usuarios mediante `DFS_USER_PASSWORDS` o `DFS_USERS`; en el cliente define `DFS_GATEWAY_URL=https://...`.
 
 Para compatibilidad, la CLI aún admite un token individual configurado en `DFS_USER_TOKEN`; el flujo de sesión es el recomendado.
 

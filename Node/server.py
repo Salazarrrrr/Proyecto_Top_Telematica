@@ -9,6 +9,7 @@ from threading import RLock
 from Proto import bloque_servicio_pb2
 from Proto import bloque_servicio_pb2_grpc
 
+from Node.client import NodeClient, max_message_bytes, peer_timeout_seconds
 from Node.models import Bloque
 from Node.storage import Almacenamiento
 
@@ -46,6 +47,9 @@ class BloqueServicio(bloque_servicio_pb2_grpc.BloqueServicioServicer):
         self.node_id = node_id
         self.membresia = []
         self._lock_membresia = RLock()
+        self._clientes_peer = {}
+        self._lock_clientes_peer = RLock()
+        self._timeout_peer = peer_timeout_seconds()
 
     def Heartbeat(self, request, context):
         try:
@@ -95,6 +99,76 @@ class BloqueServicio(bloque_servicio_pb2_grpc.BloqueServicioServicer):
                 mensaje=str(error),
                 block_id=bloque.block_id
             )
+
+    def ReplicarBloque(self, request, context):
+        bloque = Bloque(
+            block_id=request.block_id,
+            file_id=request.file_id,
+            posicion=request.posicion,
+            contenido=request.contenido,
+            checksum=request.checksum,
+        )
+        try:
+            self.almacenamiento.guardar_bloque(bloque)
+        except ValueError as error:
+            return bloque_servicio_pb2.ReplicarBloqueResponse(
+                exito=False, replicas_confirmadas=0, mensaje=str(error)
+            )
+
+        confirmadas = 1
+        errores = []
+        destinos = list(dict.fromkeys(request.destinos))
+        with self._lock_membresia:
+            miembros_conocidos = {
+                nodo.direccion for nodo in self.membresia if nodo.estado == "activo"
+            }
+        for direccion in destinos:
+            if not direccion or direccion == self.node_id:
+                errores.append(f"{direccion or '(vacío)'}: destino inválido")
+                continue
+            if miembros_conocidos and direccion not in miembros_conocidos:
+                errores.append(f"{direccion}: destino fuera de la membresía activa")
+                continue
+            try:
+                cliente = self._cliente_peer(direccion)
+                respuesta = cliente.escribir_bloque(
+                    bloque.block_id,
+                    bloque.file_id,
+                    bloque.posicion,
+                    bloque.contenido,
+                    bloque.checksum,
+                    timeout=self._timeout_peer,
+                )
+                if respuesta.exito:
+                    confirmadas += 1
+                else:
+                    errores.append(f"{direccion}: {respuesta.mensaje}")
+            except grpc.RpcError as error:
+                errores.append(f"{direccion}: {error.code().name}")
+
+        mensaje = f"Bloque guardado en {confirmadas} nodo(s)"
+        if errores:
+            mensaje += "; " + "; ".join(errores)
+        return bloque_servicio_pb2.ReplicarBloqueResponse(
+            exito=True,
+            replicas_confirmadas=confirmadas,
+            mensaje=mensaje,
+        )
+
+    def _cliente_peer(self, direccion):
+        with self._lock_clientes_peer:
+            cliente = self._clientes_peer.get(direccion)
+            if cliente is None:
+                cliente = NodeClient(direccion)
+                self._clientes_peer[direccion] = cliente
+            return cliente
+
+    def cerrar(self):
+        with self._lock_clientes_peer:
+            clientes = tuple(self._clientes_peer.values())
+            self._clientes_peer.clear()
+        for cliente in clientes:
+            cliente.canal.close()
 
     def LeerBloque(self, request, context):
         resultado = self.almacenamiento.leer_bloque_completo(request.block_id)
@@ -150,12 +224,14 @@ def iniciar_servidor(puerto=50051, directorio="almacenamiento_bloques", node_id=
     servidor = grpc.server(
         futures.ThreadPoolExecutor(max_workers=10),
         interceptors=(AutenticacionInterna(token),),
+        options=(
+            ("grpc.max_send_message_length", max_message_bytes()),
+            ("grpc.max_receive_message_length", max_message_bytes()),
+        ),
     )
 
-    bloque_servicio_pb2_grpc.add_BloqueServicioServicer_to_server(
-        BloqueServicio(directorio, node_id or f"localhost:{puerto}"),
-        servidor
-    )
+    servicio = BloqueServicio(directorio, node_id or f"localhost:{puerto}")
+    bloque_servicio_pb2_grpc.add_BloqueServicioServicer_to_server(servicio, servidor)
 
     destino = f"[{bind}]:{puerto}" if ":" in bind else f"{bind}:{puerto}"
     if cert_path:
@@ -170,11 +246,12 @@ def iniciar_servidor(puerto=50051, directorio="almacenamiento_bloques", node_id=
         puerto_abierto = servidor.add_insecure_port(destino)
     if not puerto_abierto:
         raise RuntimeError(f"No se pudo abrir el listener gRPC en {destino}")
-    servidor.start()
-
-    print(f"Node ejecutándose en el puerto {puerto}")
-
-    servidor.wait_for_termination()
+    try:
+        servidor.start()
+        print(f"Node ejecutándose en el puerto {puerto}")
+        servidor.wait_for_termination()
+    finally:
+        servicio.cerrar()
 
 
 if __name__ == "__main__":
