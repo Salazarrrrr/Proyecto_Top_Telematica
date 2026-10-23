@@ -1,14 +1,14 @@
 # DFSha
 
-Prototipo de sistema de archivos distribuido con acceso Cliente/Servidor por REST/JSON y almacenamiento en nodos gRPC. El Gateway divide archivos en bloques, asigna réplicas por hashing consistente y registra metadatos de control; los nodos guardan el contenido y verifican su checksum SHA-256.
+Prototipo de sistema de archivos distribuido con acceso Cliente/Servidor por REST/JSON y un clúster P2P gRPC implementado en Java. El Gateway autentica usuarios y conserva metadatos; los nodos Java guardan los bloques, intercambian heartbeats, difunden la membresía y replican entre pares.
 
 ## Componentes
 
 - `Client`: CLI con operaciones de archivos y directorios y shell remoto.
 - `Gateway`: API Flask, catálogo de archivos, asignación de nodos, quórums y operaciones de membresía.
-- `Node`: servicio gRPC de bloques con escritura atómica y verificación de integridad.
+- `Node`: contrato y cliente compartido para las pruebas de compatibilidad gRPC.
 - `Proto`: contrato gRPC compartido.
-- `Cluster`: servicio Java que implementa el anillo de hashing consistente y decide los nodos responsables de cada bloque.
+- `Cluster`: servicio Java con el anillo de hashing consistente y el servidor gRPC de cada nodo P2P.
 
 ## Requisitos y ejecución local
 
@@ -17,7 +17,9 @@ Instala las dependencias Python en un entorno virtual con `pip install -r requir
 Para ejecutar las pruebas automáticas:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest Gateway.test_archivos Gateway.test_cluster Gateway.test_auth Client.test_client_security -v
+.\.venv\Scripts\python.exe -m unittest discover -s Tests/Gateway -p "test_*.py" -v
+.\.venv\Scripts\python.exe -m unittest discover -s Tests/Client -p "test_*.py" -v
+.\.venv\Scripts\python.exe -m unittest discover -s Tests/Node -p "test_*.py" -v
 ```
 
 Para una demostración reproducible con contenedores, ejecuta `Deploy/configurar_entorno.ps1`, que genera secretos locales ignorados por Git y certificados de laboratorio. Luego inicia el clúster con `docker compose --env-file Deploy/.env -f Deploy/compose.yaml up --build -d`. El Gateway queda en `https://localhost:8443`; configura el cliente con `DFS_GATEWAY_URL=https://localhost:8443` y `DFS_GATEWAY_TLS_CA=<ruta absoluta a Deploy/certs/ca.crt>`. El certificado/CA generado es solo para el laboratorio. No subas `Deploy/.env` ni `Deploy/certs` al repositorio.
@@ -57,12 +59,12 @@ $bytes = New-Object byte[] 32
 $env:DFS_STORAGE_KEY = [Convert]::ToBase64String($bytes)
 ```
 
-Abre tres terminales para nodos. Cambia puerto y directorio en cada una:
+El modo recomendado ejecuta los tres nodos Java con Compose. Para iniciar nodos manualmente se requiere compilar `Cluster` con Maven y definir `DFS_NODES`, `DFS_NODE_ID`, TLS, token y almacenamiento para cada proceso:
 
 ```powershell
 $env:DFS_NODE_PORT = "50051"
 $env:DFS_NODE_STORAGE = "almacenamiento_bloques\nodo1"
-python -m Node.server
+java -cp Cluster/target/dfsha-cluster-1.0.jar dfsha.NodeServer
 ```
 
 En otra terminal registra las direcciones y arranca el Gateway:
@@ -98,7 +100,9 @@ Una persona nueva puede crear su propia cuenta mediante `POST /auth/register` o 
 
 Los nodos escuchan solo en `127.0.0.1` por defecto. Las rutas de diagnóstico `/blocks` están desactivadas si no configuras `DFS_ADMIN_TOKEN` y requieren ese token aparte. `GET /health` no requiere autenticación y permite que Docker o un balanceador comprueben la disponibilidad del Gateway.
 
-Los nodos cifran los bloques en disco con AES-GCM y requieren `DFS_STORAGE_KEY`; usa una llave distinta por nodo y protégela con un gestor de secretos. Para red remota configura además `DFS_NODE_BIND=0.0.0.0`, `DFS_NODE_TLS_CERT` y `DFS_NODE_TLS_KEY` en cada nodo, `DFS_NODE_TLS_CA` y `DFS_NODE_TLS_REQUIRED=1` en el Gateway, y un `DFS_NODE_TOKEN` compartido. Se puede habilitar autenticación mutua TLS con `DFS_NODE_CLIENT_CA` en el nodo y certificado/llave de cliente en el Gateway. Para exponer REST, configura `DFS_GATEWAY_BIND`, `DFS_GATEWAY_TLS_CERT`, `DFS_GATEWAY_TLS_KEY` y usuarios mediante `DFS_USER_PASSWORDS` o `DFS_USERS`; en el cliente define `DFS_GATEWAY_URL=https://...`.
+En una escritura, el Gateway calcula los nodos responsables y llama a `ReplicarBloque` en uno de ellos. Ese nodo guarda su copia y envía el bloque directamente a los demás responsables mediante gRPC; el Gateway confirma la operación según el quórum W. La transferencia de réplicas es nodo-a-nodo, pero la selección de destinos, membresía y coordinación siguen a cargo del Gateway: esto no convierte el clúster en una DHT ni elimina el punto central de coordinación.
+
+Los nodos cifran los bloques en disco con AES-GCM y requieren `DFS_STORAGE_KEY`; usa una llave distinta por nodo y protégela con un gestor de secretos. Para la replicación directa entre nodos, cada nodo también necesita `DFS_NODE_TLS_CA`, `DFS_NODE_TLS_REQUIRED=1`, el nombre TLS esperado en `DFS_NODE_TLS_SERVER_NAME` y acceso de red a los demás nodos. Para red remota configura además `DFS_NODE_BIND=0.0.0.0`, `DFS_NODE_TLS_CERT` y `DFS_NODE_TLS_KEY` en cada nodo, `DFS_NODE_TLS_CA` y `DFS_NODE_TLS_REQUIRED=1` en el Gateway, y un `DFS_NODE_TOKEN` compartido. El límite gRPC `DFS_GRPC_MAX_MESSAGE_BYTES` predetermina 65 MiB y debe ser mayor que el tamaño máximo de bloque más el encabezado del protocolo. `DFS_NODE_PEER_TIMEOUT` predetermina 10 segundos por llamada de un nodo a su réplica y debe configurarse igual en Gateway y nodos. Se puede habilitar autenticación mutua TLS con `DFS_NODE_CLIENT_CA` en los nodos y certificados/llaves de cliente en cada Gateway y nodo que realice llamadas gRPC. Para exponer REST, configura `DFS_GATEWAY_BIND`, `DFS_GATEWAY_TLS_CERT`, `DFS_GATEWAY_TLS_KEY` y usuarios mediante `DFS_USER_PASSWORDS` o `DFS_USERS`; en el cliente define `DFS_GATEWAY_URL=https://...`.
 
 Para compatibilidad, la CLI aún admite un token individual configurado en `DFS_USER_TOKEN`; el flujo de sesión es el recomendado.
 
@@ -154,7 +158,7 @@ El primer inicio requiere que el dominio ya resuelva a la IP de EC2 y que los pu
 
 El clúster exige W mayoritario y R + W > N para asegurar intersección entre quórums. Una lectura solo acepta contenido que alcance R; si hay réplicas divergentes sin un valor con quórum, falla de forma segura en vez de escoger una copia arbitraria. Al agregar un nodo, valida las copias destino antes de limpiar las réplicas fuera del anillo. El metadato del archivo solo se publica después de completar todos sus bloques, y cada escritura de bloque usa reemplazo atómico para que una lectura no vea un archivo parcialmente escrito.
 
-El servicio Java calcula los responsables de cada bloque mediante hashing consistente. El Gateway consulta ese servicio antes de cada escritura, lectura, rebalanceo o recuperación de réplicas; después realiza los heartbeats gRPC, actualiza la membresía y coordina las operaciones de bloques. La capacidad libre se consulta en cada heartbeat. Al cambiar la membresía, el Gateway intenta recuperar las réplicas que aún cumplen R y W y limpia copias que quedaron fuera del anillo. Para despliegues remotos, activa TLS en gRPC y HTTPS en REST con certificados confiables.
+El servicio Java calcula los responsables de cada bloque mediante hashing consistente. Cada nodo Java mantiene una vista local de membresía, consulta por gRPC el heartbeat de sus pares cada cinco segundos y difunde directamente la vista cuando detecta una incorporación o caída. El Gateway conserva el catálogo y coordina la solicitud del cliente, mientras el nodo coordinador transfiere las réplicas a los demás nodos. Para despliegues remotos, activa TLS en gRPC y HTTPS en REST con certificados confiables.
 
 Siguen pendientes la tolerancia a la caída del propio Gateway y la replicación del catálogo: esta versión usa coordinación central y un catálogo JSON local. Tampoco implementa acceso aleatorio con `open/read/write/lock` ni un montaje transparente como sistema de archivos del sistema operativo; ofrece transferencia de archivos y gestión de directorios por CLI/API.
 

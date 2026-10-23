@@ -5,7 +5,7 @@ import warnings
 
 from Proto import bloque_servicio_pb2 as Proto_dot_bloque__servicio__pb2
 
-GRPC_GENERATED_VERSION = '1.84.0'
+GRPC_GENERATED_VERSION = '1.84.1'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -41,6 +41,11 @@ class BloqueServicioStub:
                 request_serializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueRequest.SerializeToString,
                 response_deserializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueResponse.FromString,
                 _registered_method=True)
+        self.ReplicarBloque = channel.unary_unary(
+                '/dfsha.BloqueServicio/ReplicarBloque',
+                request_serializer=Proto_dot_bloque__servicio__pb2.ReplicarBloqueRequest.SerializeToString,
+                response_deserializer=Proto_dot_bloque__servicio__pb2.ReplicarBloqueResponse.FromString,
+                _registered_method=True)
         self.LeerBloque = channel.unary_unary(
                 '/dfsha.BloqueServicio/LeerBloque',
                 request_serializer=Proto_dot_bloque__servicio__pb2.LeerBloqueRequest.SerializeToString,
@@ -70,6 +75,13 @@ class BloqueServicioServicer:
 
     def EscribirBloque(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReplicarBloque(self, request, context):
+        """El nodo coordinador escribe localmente y propaga el bloque a sus réplicas.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -107,6 +119,11 @@ def add_BloqueServicioServicer_to_server(servicer, server):
                     servicer.EscribirBloque,
                     request_deserializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueRequest.FromString,
                     response_serializer=Proto_dot_bloque__servicio__pb2.EscribirBloqueResponse.SerializeToString,
+            ),
+            'ReplicarBloque': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReplicarBloque,
+                    request_deserializer=Proto_dot_bloque__servicio__pb2.ReplicarBloqueRequest.FromString,
+                    response_serializer=Proto_dot_bloque__servicio__pb2.ReplicarBloqueResponse.SerializeToString,
             ),
             'LeerBloque': grpc.unary_unary_rpc_method_handler(
                     servicer.LeerBloque,
@@ -158,6 +175,33 @@ class BloqueServicio:
             '/dfsha.BloqueServicio/EscribirBloque',
             Proto_dot_bloque__servicio__pb2.EscribirBloqueRequest.SerializeToString,
             Proto_dot_bloque__servicio__pb2.EscribirBloqueResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReplicarBloque(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/dfsha.BloqueServicio/ReplicarBloque',
+            Proto_dot_bloque__servicio__pb2.ReplicarBloqueRequest.SerializeToString,
+            Proto_dot_bloque__servicio__pb2.ReplicarBloqueResponse.FromString,
             options,
             channel_credentials,
             insecure,

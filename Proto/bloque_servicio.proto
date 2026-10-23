@@ -11,6 +11,9 @@ service BloqueServicio {
 
     rpc EscribirBloque(EscribirBloqueRequest) returns (EscribirBloqueResponse);
 
+    // El nodo coordinador escribe localmente y propaga el bloque a sus réplicas.
+    rpc ReplicarBloque(ReplicarBloqueRequest) returns (ReplicarBloqueResponse);
+
     rpc LeerBloque(LeerBloqueRequest) returns (LeerBloqueResponse);
 
     rpc EliminarBloque(EliminarBloqueRequest) returns (EliminarBloqueResponse);
@@ -84,6 +87,21 @@ message EscribirBloqueResponse {
 
     // Identificador del bloque relacionado con la operación.
     string block_id = 3;
+}
+
+message ReplicarBloqueRequest {
+    string block_id = 1;
+    string file_id = 2;
+    int32 posicion = 3;
+    bytes contenido = 4;
+    string checksum = 5;
+    repeated string destinos = 6;
+}
+
+message ReplicarBloqueResponse {
+    bool exito = 1;
+    uint32 replicas_confirmadas = 2;
+    string mensaje = 3;
 }
 
 

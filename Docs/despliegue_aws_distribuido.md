@@ -1,6 +1,6 @@
 # Despliegue distribuido en AWS
 
-Este despliegue usa cuatro instancias EC2 dentro de la misma VPC: un Gateway público y tres nodos privados de almacenamiento. El Gateway se publica mediante Caddy y HTTPS; los nodos solamente aceptan gRPC desde el Security Group del Gateway.
+Este despliegue usa cuatro instancias EC2 dentro de la misma VPC: un Gateway público y tres nodos privados de almacenamiento. El Gateway se publica mediante Caddy y HTTPS; los nodos aceptan gRPC desde el Security Group del Gateway y entre miembros del Security Group de nodos para permitir la replicación directa.
 
 ## 1. Recursos en AWS
 
@@ -23,6 +23,7 @@ Configura los Security Groups así:
 | `sg-dfsha-gateway` | TCP 80 y 443 | `0.0.0.0/0` |
 | `sg-dfsha-nodes` | TCP 22 | IP pública de administración |
 | `sg-dfsha-nodes` | TCP 50051 | `sg-dfsha-gateway` |
+| `sg-dfsha-nodes` | TCP 50051 | `sg-dfsha-nodes` |
 
 No abras TCP 50051 a Internet. Anota las tres IP privadas de los nodos y el dominio público del Gateway.
 

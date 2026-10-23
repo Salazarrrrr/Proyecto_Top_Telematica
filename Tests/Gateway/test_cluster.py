@@ -9,13 +9,13 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from Gateway.cluster import ClusterManager
+from Gateway.cluster_comunication import ClusterManager
 
 
 class TestQuorum(unittest.TestCase):
     def test_asignacion_de_bloque_consulta_servicio_java(self):
         with patch.dict(os.environ, {"DFS_CLUSTER_JAVA_URL": "http://cluster-java:8081"}), \
-             patch("Gateway.cluster.cluster_core.NodeClient") as cliente:
+             patch("Gateway.cluster_comunication.cluster_core.NodeClient") as cliente:
             cliente.return_value.canal = SimpleNamespace(close=lambda: None)
             cluster = ClusterManager(
                 nodos="nodo-a:1,nodo-b:2,nodo-c:3", factor_replicacion=2,
@@ -33,7 +33,7 @@ class TestQuorum(unittest.TestCase):
     def test_factor_se_conserva_al_reiniciar_el_gateway(self):
         with tempfile.TemporaryDirectory() as directorio, patch.dict(
             os.environ, {"DFS_CLUSTER_CONFIG": os.path.join(directorio, "cluster.json")}
-        ), patch("Gateway.cluster.cluster_core.NodeClient") as cliente:
+        ), patch("Gateway.cluster_comunication.cluster_core.NodeClient") as cliente:
             cliente.return_value.canal = SimpleNamespace(close=lambda: None)
             primero = ClusterManager(
                 nodos="nodo-a:1,nodo-b:2,nodo-c:3", factor_replicacion=3,
@@ -106,9 +106,18 @@ class TestQuorum(unittest.TestCase):
             def __init__(self, exito):
                 self.exito = exito
                 self.canal = SimpleNamespace(close=lambda: None)
+                self.llamadas = []
 
-            def escribir_bloque(self, *args, timeout=None):
-                return SimpleNamespace(exito=self.exito, mensaje="fallo")
+            def replicar_bloque(
+                self, block_id, file_id, posicion, contenido, checksum,
+                destinos, timeout=None,
+            ):
+                self.llamadas.append(destinos)
+                replicas = 2 if self.exito else 1
+                return SimpleNamespace(
+                    replicas_confirmadas=replicas,
+                    mensaje="respuesta de prueba",
+                )
 
         for cliente in cluster.clientes.values():
             cliente.canal.close()
@@ -120,7 +129,11 @@ class TestQuorum(unittest.TestCase):
         try:
             exito, _ = cluster.escribir_bloque("bloque", "archivo", 0, b"x", "sum")
             self.assertTrue(exito)
-            cluster.clientes["nodo-b:2"].exito = False
+            self.assertEqual(len(next(
+                cliente for cliente in cluster.clientes.values() if cliente.llamadas
+            ).llamadas[0]), 2)
+            for cliente in cluster.clientes.values():
+                cliente.exito = False
             exito, mensaje = cluster.escribir_bloque("bloque", "archivo", 0, b"x", "sum")
             self.assertFalse(exito)
             self.assertIn("Quórum", mensaje)
@@ -140,6 +153,14 @@ class TestQuorum(unittest.TestCase):
                 self.eliminados = []
 
             def heartbeat(self, *_args, timeout=None):
+                return SimpleNamespace(
+                    exito=True,
+                    node_id=self.nombre,
+                    last_heartbeat_unix_ms=0,
+                    capacidad_disponible_bytes=1024,
+                )
+
+            def actualizar_membresia(self, *_args, timeout=None):
                 return SimpleNamespace(exito=True)
 
             def leer_bloque(self, *_args, timeout=None):
@@ -149,8 +170,11 @@ class TestQuorum(unittest.TestCase):
                     file_id="f", posicion=0,
                 )
 
-            def escribir_bloque(self, *_args, timeout=None):
-                return SimpleNamespace(exito=True)
+            def replicar_bloque(self, *args, timeout=None):
+                return SimpleNamespace(
+                    replicas_confirmadas=1 + len(args[5]),
+                    mensaje="Bloque replicado",
+                )
 
             def eliminar_bloque(self, block_id, timeout=None):
                 self.eliminados.append(block_id)
@@ -169,7 +193,10 @@ class TestQuorum(unittest.TestCase):
             "checksum": hashlib.sha256(b"dato").hexdigest(),
         }]}
         try:
-            with patch("Gateway.cluster.cluster_membership.NodeClient", return_value=nodos["nodo-d:4"]):
+            with patch(
+                "Gateway.cluster_comunication.cluster_membership.NodeClient",
+                return_value=nodos["nodo-d:4"],
+            ):
                 resultado = cluster.agregar_nodo_y_rebalancear("nodo-d:4", [archivo])
             self.assertEqual(resultado["copias_confirmadas"], 3)
             self.assertEqual(nodos["nodo-c:3"].eliminados, ["f-0"])

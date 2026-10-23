@@ -2,14 +2,20 @@ services:
   node:
     build:
       context: ..
-    command: ["python", "-m", "Node.server"]
+      dockerfile: Cluster/Dockerfile
+    command: ["java", "-cp", "/app/cluster.jar", "dfsha.NodeServer"]
     restart: unless-stopped
     environment:
       DFS_NODE_BIND: 0.0.0.0
       DFS_NODE_PORT: "50051"
       DFS_NODE_ID: ${DFS_NODE_ID:?set this node private IP followed by :50051}
+      DFS_NODES: ${DFS_NODES:?set all private node addresses in Deploy/.env}
       DFS_NODE_TLS_CERT: /run/certs/nodes.crt
       DFS_NODE_TLS_KEY: /run/certs/nodes.key
+      DFS_NODE_TLS_CA: /run/certs/ca.crt
+      DFS_NODE_TLS_REQUIRED: "1"
+      DFS_NODE_TLS_SERVER_NAME: node1
+      DFS_NODE_PEER_TIMEOUT: "10"
       DFS_NODE_TOKEN: ${DFS_NODE_TOKEN:?set the shared internal token in Deploy/.env}
       DFS_STORAGE_KEY: ${DFS_STORAGE_KEY:?set a unique base64 AES-256 key in Deploy/.env}
       DFS_NODE_STORAGE: /var/lib/dfsha
@@ -19,7 +25,7 @@ services:
       - node-data:/var/lib/dfsha
       - ./certs:/run/certs:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 50051), 2).close()"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/50051"]
       interval: 10s
       timeout: 3s
       retries: 5

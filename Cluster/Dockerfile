@@ -1,7 +1,8 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /src
-COPY pom.xml .
-COPY src ./src
+COPY Cluster/pom.xml ./pom.xml
+COPY Proto /Proto
+COPY Cluster/src ./src
 RUN mvn --batch-mode package -DskipTests
 
 FROM eclipse-temurin:17-jre

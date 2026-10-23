@@ -46,21 +46,20 @@ class ReplicationOperations:
                     respuesta = self.leer_bloque(bloque["block_id"])
                     if respuesta is None:
                         raise RuntimeError(f"No se pudo leer {bloque['block_id']}")
-                    responsables = set(self.nodos_responsables(bloque["block_id"]))
-                    confirmaciones = 0
-                    for destino in responsables:
-                        try:
-                            ack = self._invocar(
-                                destino, "escribir_bloque", bloque["block_id"],
-                                archivo["file_id"], bloque["posicion"],
-                                respuesta.contenido, bloque["checksum"],
-                            )
-                            confirmaciones += int(ack.exito)
-                        except grpc.RpcError:
-                            continue
-                    quorum = self.quorum_escritura
-                    if confirmaciones < quorum:
-                        raise RuntimeError(f"No se alcanzó W al replicar {bloque['block_id']}")
+                    destinos = self.nodos_responsables(bloque["block_id"])
+                    responsables = set(destinos)
+                    exito, confirmaciones, mensaje = self._escribir_en_destinos(
+                        destinos,
+                        bloque["block_id"],
+                        archivo["file_id"],
+                        bloque["posicion"],
+                        respuesta.contenido,
+                        bloque["checksum"],
+                    )
+                    if not exito:
+                        raise RuntimeError(
+                            f"No se alcanzó W al replicar {bloque['block_id']}: {mensaje}"
+                        )
                     guardados += confirmaciones
                     if nuevo_factor < anterior:
                         plan_eliminacion.append((bloque["block_id"], set(self.direcciones) - responsables))
