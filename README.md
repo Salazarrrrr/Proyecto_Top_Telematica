@@ -1,14 +1,14 @@
 # DFSha
 
-Prototipo de sistema de archivos distribuido con acceso Cliente/Servidor por REST/JSON y almacenamiento en nodos gRPC. El Gateway divide archivos en bloques, asigna réplicas por hashing consistente y registra metadatos de control; los nodos guardan el contenido y verifican su checksum SHA-256.
+Prototipo de sistema de archivos distribuido con acceso Cliente/Servidor por REST/JSON y un clúster P2P gRPC implementado en Java. El Gateway autentica usuarios y conserva metadatos; los nodos Java guardan los bloques, intercambian heartbeats, difunden la membresía y replican entre pares.
 
 ## Componentes
 
 - `Client`: CLI con operaciones de archivos y directorios y shell remoto.
 - `Gateway`: API Flask, catálogo de archivos, asignación de nodos, quórums y operaciones de membresía.
-- `Node`: servicio gRPC de bloques con escritura atómica y verificación de integridad.
+- `Node`: contrato y cliente compartido para las pruebas de compatibilidad gRPC.
 - `Proto`: contrato gRPC compartido.
-- `Cluster`: servicio Java que implementa el anillo de hashing consistente y decide los nodos responsables de cada bloque.
+- `Cluster`: servicio Java con el anillo de hashing consistente y el servidor gRPC de cada nodo P2P.
 
 ## Requisitos y ejecución local
 
@@ -59,12 +59,12 @@ $bytes = New-Object byte[] 32
 $env:DFS_STORAGE_KEY = [Convert]::ToBase64String($bytes)
 ```
 
-Abre tres terminales para nodos. Cambia puerto y directorio en cada una:
+El modo recomendado ejecuta los tres nodos Java con Compose. Para iniciar nodos manualmente se requiere compilar `Cluster` con Maven y definir `DFS_NODES`, `DFS_NODE_ID`, TLS, token y almacenamiento para cada proceso:
 
 ```powershell
 $env:DFS_NODE_PORT = "50051"
 $env:DFS_NODE_STORAGE = "almacenamiento_bloques\nodo1"
-python -m Node.server
+java -cp Cluster/target/dfsha-cluster-1.0.jar dfsha.NodeServer
 ```
 
 En otra terminal registra las direcciones y arranca el Gateway:
@@ -158,7 +158,7 @@ El primer inicio requiere que el dominio ya resuelva a la IP de EC2 y que los pu
 
 El clúster exige W mayoritario y R + W > N para asegurar intersección entre quórums. Una lectura solo acepta contenido que alcance R; si hay réplicas divergentes sin un valor con quórum, falla de forma segura en vez de escoger una copia arbitraria. Al agregar un nodo, valida las copias destino antes de limpiar las réplicas fuera del anillo. El metadato del archivo solo se publica después de completar todos sus bloques, y cada escritura de bloque usa reemplazo atómico para que una lectura no vea un archivo parcialmente escrito.
 
-El servicio Java calcula los responsables de cada bloque mediante hashing consistente. El Gateway consulta ese servicio antes de cada escritura, lectura, rebalanceo o recuperación de réplicas; después realiza los heartbeats gRPC, actualiza la membresía y coordina las operaciones de bloques. La capacidad libre se consulta en cada heartbeat. Al cambiar la membresía, el Gateway intenta recuperar las réplicas que aún cumplen R y W y limpia copias que quedaron fuera del anillo. Para despliegues remotos, activa TLS en gRPC y HTTPS en REST con certificados confiables.
+El servicio Java calcula los responsables de cada bloque mediante hashing consistente. Cada nodo Java mantiene una vista local de membresía, consulta por gRPC el heartbeat de sus pares cada cinco segundos y difunde directamente la vista cuando detecta una incorporación o caída. El Gateway conserva el catálogo y coordina la solicitud del cliente, mientras el nodo coordinador transfiere las réplicas a los demás nodos. Para despliegues remotos, activa TLS en gRPC y HTTPS en REST con certificados confiables.
 
 Siguen pendientes la tolerancia a la caída del propio Gateway y la replicación del catálogo: esta versión usa coordinación central y un catálogo JSON local. Tampoco implementa acceso aleatorio con `open/read/write/lock` ni un montaje transparente como sistema de archivos del sistema operativo; ofrece transferencia de archivos y gestión de directorios por CLI/API.
 

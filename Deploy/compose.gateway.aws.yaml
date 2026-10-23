@@ -1,7 +1,8 @@
 services:
   cluster-java:
     build:
-      context: ../Cluster
+      context: ..
+      dockerfile: Cluster/Dockerfile
     restart: unless-stopped
     networks: [dfsha]
     healthcheck:

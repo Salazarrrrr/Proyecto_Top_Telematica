@@ -1,7 +1,8 @@
 services:
   cluster-java:
     build:
-      context: ../Cluster
+      context: ..
+      dockerfile: Cluster/Dockerfile
     restart: unless-stopped
     networks: [dfsha]
     healthcheck:
@@ -13,7 +14,8 @@ services:
   node1:
     build:
       context: ..
-    command: ["python", "-m", "Node.server"]
+      dockerfile: Cluster/Dockerfile
+    command: ["java", "-cp", "/app/cluster.jar", "dfsha.NodeServer"]
     restart: unless-stopped
     environment: &node_environment
       DFS_NODE_BIND: 0.0.0.0
@@ -28,12 +30,13 @@ services:
       DFS_NODE_STORAGE: /var/lib/dfsha
       DFS_NODE_PORT: "50051"
       DFS_NODE_ID: node1:50051
+      DFS_NODES: node1:50051,node2:50052,node3:50053
     volumes:
       - node1-data:/var/lib/dfsha
       - ./certs:/run/certs:ro
     networks: [dfsha]
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 50051), 2).close()"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/50051"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -41,19 +44,21 @@ services:
   node2:
     build:
       context: ..
-    command: ["python", "-m", "Node.server"]
+      dockerfile: Cluster/Dockerfile
+    command: ["java", "-cp", "/app/cluster.jar", "dfsha.NodeServer"]
     restart: unless-stopped
     environment:
       <<: *node_environment
       DFS_STORAGE_KEY: ${DFS_NODE2_STORAGE_KEY:?set a unique 32-byte key in Deploy/.env}
       DFS_NODE_PORT: "50052"
       DFS_NODE_ID: node2:50052
+      DFS_NODES: node1:50051,node2:50052,node3:50053
     volumes:
       - node2-data:/var/lib/dfsha
       - ./certs:/run/certs:ro
     networks: [dfsha]
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 50052), 2).close()"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/50052"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -61,19 +66,21 @@ services:
   node3:
     build:
       context: ..
-    command: ["python", "-m", "Node.server"]
+      dockerfile: Cluster/Dockerfile
+    command: ["java", "-cp", "/app/cluster.jar", "dfsha.NodeServer"]
     restart: unless-stopped
     environment:
       <<: *node_environment
       DFS_STORAGE_KEY: ${DFS_NODE3_STORAGE_KEY:?set a unique 32-byte key in Deploy/.env}
       DFS_NODE_PORT: "50053"
       DFS_NODE_ID: node3:50053
+      DFS_NODES: node1:50051,node2:50052,node3:50053
     volumes:
       - node3-data:/var/lib/dfsha
       - ./certs:/run/certs:ro
     networks: [dfsha]
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 50053), 2).close()"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/50053"]
       interval: 10s
       timeout: 3s
       retries: 5
