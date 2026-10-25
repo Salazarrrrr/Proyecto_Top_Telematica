@@ -1,165 +1,173 @@
-# DFSha
+DFSha
+DFSha es un prototipo de sistema de archivos distribuido. Permite
+autenticarse desde una CLI, crear directorios virtuales, subir archivos,
+consultar el catálogo y recuperar archivos mediante un Gateway
+REST/HTTPS y un clúster de almacenamiento distribuido con gRPC.
+Esta documentación describe el proyecto y el flujo de demostración
+utilizado. Los nombres de archivos, comandos y rutas deben coincidir
+con la versión desplegada en el repositorio.
 
-Prototipo de sistema de archivos distribuido con acceso Cliente/Servidor por REST/JSON y un clúster P2P gRPC implementado en Java. El Gateway autentica usuarios y conserva metadatos; los nodos Java guardan los bloques, intercambian heartbeats, difunden la membresía y replican entre pares.
+Arquitectura
+- Client: CLI de Python para autenticación, navegación de
+  directorios y transferencia de archivos.
+- Gateway: API REST basada en Flask. Autentica usuarios, aplica
+  permisos, mantiene el catálogo de metadatos y coordina lecturas y
+  escrituras.
+- Cluster Java: nodos de almacenamiento que se comunican mediante
+  gRPC, intercambian heartbeats y replican bloques entre pares.
+- Proto: contrato compartido para las operaciones gRPC.
+- Deploy: archivos de configuración y despliegue de contenedores.
+El Gateway coordina las operaciones del cliente. Los bloques se
+distribuyen entre los nodos responsables y las lecturas/escrituras
+aplican quórums configurados. El catálogo de archivos y directorios se
+conserva en el almacenamiento de metadatos del Gateway.
+Requisitos
+- Python y las dependencias de requirements.txt.
+- Un entorno virtual Python.
+- Docker y Docker Compose para ejecutar el despliegue en contenedores.
+- Acceso de red al Gateway.
+- Para el despliegue de laboratorio con TLS propio, el certificado CA
+  correspondiente.
+- Para el despliegue en AWS, las credenciales de usuario de DFSha y la
+  URL HTTPS del Gateway.
+Instala las dependencias desde la raíz del repositorio:
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Configurar el cliente
+Despliegue AWS
+Configura la URL pública HTTPS del Gateway y, si el despliegue utiliza
+el certificado del laboratorio, la ruta al certificado CA
+correspondiente. En el entorno utilizado para la demostración:
+$env:DFS_GATEWAY_URL = "https://52.71.140.30:8443"
+$env:DFS_GATEWAY_TLS_CA = "C:\Users\aceve\Desktop\Telematica_proyecto\Proyecto_Top_Telematica\Deploy\certs\ca.crt"
+La IP y las rutas anteriores son específicas del entorno de
+demostración. Si cambia la IP, el dominio, el equipo o el certificado,
+actualiza estos valores. No publiques claves privadas, tokens ni
+archivos de secretos.
+Ejecución del cliente
+Desde la raíz del repositorio, con el entorno virtual activado:
+python -m Client.client
+Para ejecutar un subcomando directamente, utiliza
+python -m Client.client <comando>.
+Registro, inicio de sesión y shell
+Registra un usuario normal:
+python -m Client.client register <usuario>
+La CLI solicitará la contraseña y su confirmación. El registro público
+asigna el rol de usuario normal.
 
-## Componentes
+Inicia sesión explícitamente con esa cuenta:
+python -m Client.client login <usuario>
+Después, abre el shell interactivo:
+python -m Client.client shell
+Dentro del shell puedes comprobar la identidad y el espacio remoto con
+los comandos disponibles. Para cerrar el shell, ejecuta exit.
 
-- `Client`: CLI con operaciones de archivos y directorios y shell remoto.
-- `Gateway`: API Flask, catálogo de archivos, asignación de nodos, quórums y operaciones de membresía.
-- `Node`: contrato y cliente compartido para las pruebas de compatibilidad gRPC.
-- `Proto`: contrato gRPC compartido.
-- `Cluster`: servicio Java con el anillo de hashing consistente y el servidor gRPC de cada nodo P2P.
+Importante: registra la cuenta y luego inicia sesión con esa misma
+cuenta antes de realizar la demostración. No asumas que registrar un
+usuario inicia automáticamente una sesión autenticada.
+Comandos del shell
+  Comando                             Función
+  help                              Muestra los comandos disponibles.
 
-## Requisitos y ejecución local
+  pwd                               Muestra la ruta remota actual.
 
-Instala las dependencias Python en un entorno virtual con `pip install -r requirements.txt`. Ejecuta desde la raíz del repositorio.
+  ls [ruta]                         Lista directorios y archivos de una
+                                      ruta.
 
-Para ejecutar las pruebas automáticas:
+  list                              Lista archivos del directorio
+                                      actual.
 
-```powershell
+  cd <ruta>                         Cambia el directorio remoto actual.
+
+  mkdir <ruta>                      Crea un directorio remoto.
+
+  rmdir <ruta>                      Elimina un directorio remoto vacío.
+
+  store <archivo_local>             Sube un archivo local al directorio
+                                      remoto actual.
+
+  get <nombre_o_id> [salida]        Descarga un archivo a la ruta local
+                                      indicada.
+
+  rm <nombre_o_id>                  Elimina un archivo.
+  exit                              Cierra el shell.
+Las rutas locales de Windows deben escribirse entre comillas si
+contienen espacios.
+Flujo de demostración: subir y descargar un archivo
+Este ejemplo utiliza el video Parte1.mp4. Asegúrate de que exista en
+la ruta local indicada.
+1. Configura el cliente y autentícate:
+   $env:DFS_GATEWAY_URL = "https://52.71.140.30:8443"
+   $env:DFS_GATEWAY_TLS_CA = "C:\Users\aceve\Desktop\Telematica_proyecto\Proyecto_Top_Telematica\Deploy\certs\ca.crt"
+   python -m Client.client login Sustentacion
+   python -m Client.client shell
+2. En el shell de DFSha, crea y abre un directorio:
+   mkdir demostracion
+   cd demostracion
+   pwd
+3. Sube el archivo:
+   store "C:\Users\aceve\Desktop\Sustentacion Telematica\Parte1.mp4"
+   La respuesta de éxito incluye file_id, el nombre del archivo y el
+   número de bloques. Guarda el file_id devuelto por esa operación;
+   cada subida puede generar un identificador distinto.
+4. Comprueba el catálogo del directorio:
+   list
+5. Descarga el archivo utilizando el identificador real devuelto por
+   store:
+   get <file_id> "C:\Users\aceve\Desktop\Sustentacion Telematica\recuperado_Parte1.mp4"
+6. Comprueba que el archivo recuperado exista y pueda reproducirse.
+   Después, cierra el shell:
+   exit
+El comando get utiliza la sintaxis get <nombre_o_id> [salida]; no es
+necesario agregar --salida dentro del shell interactivo.
+Seguridad y aislamiento de usuarios
+- Cada solicitud autenticada debe utilizar el token de la sesión
+  correspondiente.
+- Después de register, ejecuta login con el usuario registrado
+  antes de abrir el shell.
+- Los usuarios normales deben acceder únicamente a sus propios
+  archivos y directorios.
+- No compartas contraseñas, tokens de sesión, gateway.env,
+  Deploy/.env, llaves privadas ni secretos.
+- Conserva el volumen y los archivos de metadatos del Gateway. Los
+  metadatos identifican el propietario de cada archivo y permiten
+  mantener el catálogo entre reinicios.
+- Los nodos de almacenamiento no deben exponerse públicamente sin las
+  reglas de red y la protección TLS previstas por el despliegue.
+Despliegue
+Los comandos de despliegue dependen del archivo Compose y del archivo de
+entorno utilizados en cada entorno. Antes de ejecutar
+docker compose up, confirma que la ruta del archivo de entorno exista
+y que el archivo Compose corresponda al despliegue elegido.
+
+Para el entorno AWS utilizado en esta demostración, se ha empleado el
+archivo Compose del Gateway:
+
+sudo docker compose --env-file /home/ec2-user/gateway.env \
+  -f Deploy/compose.gateway.aws.yaml up -d --build gateway
+El archivo de entorno de AWS está fuera del repositorio en ese entorno.
+
+No lo crees de nuevo ni lo reemplaces por un archivo vacío: contiene
+configuración sensible y necesaria para el servicio.
+
+Para revisar el estado de los contenedores:
+sudo docker ps
+Para revisar los registros del Gateway:
+sudo docker logs --since 10m deploy-gateway-1
+Los nombres de los contenedores y las rutas anteriores corresponden al
+despliegue de referencia y pueden variar en otro entorno.
+Pruebas automáticas
+
+Desde la raíz del repositorio, ejecuta las pruebas disponibles:
 .\.venv\Scripts\python.exe -m unittest discover -s Tests/Gateway -p "test_*.py" -v
 .\.venv\Scripts\python.exe -m unittest discover -s Tests/Client -p "test_*.py" -v
 .\.venv\Scripts\python.exe -m unittest discover -s Tests/Node -p "test_*.py" -v
-```
 
-Para una demostración reproducible con contenedores, ejecuta `Deploy/configurar_entorno.ps1`, que genera secretos locales ignorados por Git y certificados de laboratorio. Luego inicia el clúster con `docker compose --env-file Deploy/.env -f Deploy/compose.yaml up --build -d`. El Gateway queda en `https://localhost:8443`; configura el cliente con `DFS_GATEWAY_URL=https://localhost:8443` y `DFS_GATEWAY_TLS_CA=<ruta absoluta a Deploy/certs/ca.crt>`. El certificado/CA generado es solo para el laboratorio. No subas `Deploy/.env` ni `Deploy/certs` al repositorio.
-
-Prueba el despliegue Compose desde PowerShell. Docker Desktop debe estar iniciado. En una terminal, arranca el clúster:
-
-```powershell
-docker compose --env-file Deploy/.env -f Deploy/compose.yaml up --build -d
-```
-
-En otra terminal, configura el cliente e inicia sesión. Si creaste el entorno con `configurar_entorno.ps1`, usa las contraseñas que el script mostró al finalizar:
-
-```powershell
-$env:DFS_GATEWAY_URL = "https://localhost:8443"
-$env:DFS_GATEWAY_TLS_CA = (Resolve-Path Deploy/certs/ca.crt).Path
-$env:DFS_DEFAULT_USER = "demo"
-$python = ".\.venv\Scripts\python.exe"
-
-& $python -m Client.client login demo
-
-Set-Content -NoNewline -Path .\prueba.txt -Value "prueba DFSha"
-& $python -m Client.client store .\prueba.txt
-& $python -m Client.client list
-& $python -m Client.client get prueba.txt --salida .\copia.txt
-Get-FileHash .\prueba.txt -Algorithm SHA256
-Get-FileHash .\copia.txt -Algorithm SHA256
-& $python -m Client.client delete prueba.txt
-& $python -m Client.client logout
-docker compose --env-file Deploy/.env -f Deploy/compose.yaml down
-```
-
-Genera una llave AES-256 para cada nodo y consérvala fuera del repositorio. En cada terminal de nodo, antes de iniciarlo:
-
-```powershell
-$bytes = New-Object byte[] 32
-[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-$env:DFS_STORAGE_KEY = [Convert]::ToBase64String($bytes)
-```
-
-El modo recomendado ejecuta los tres nodos Java con Compose. Para iniciar nodos manualmente se requiere compilar `Cluster` con Maven y definir `DFS_NODES`, `DFS_NODE_ID`, TLS, token y almacenamiento para cada proceso:
-
-```powershell
-$env:DFS_NODE_PORT = "50051"
-$env:DFS_NODE_STORAGE = "almacenamiento_bloques\nodo1"
-java -cp Cluster/target/dfsha-cluster-1.0.jar dfsha.NodeServer
-```
-
-En otra terminal registra las direcciones y arranca el Gateway:
-
-```powershell
-$env:DFS_NODES = "localhost:50051,localhost:50052,localhost:50053"
-$env:DFS_REPLICATION_FACTOR = "3"
-$env:DFS_READ_QUORUM = "2"
-$env:DFS_WRITE_QUORUM = "2"
-$env:DFS_BLOCK_SIZE = "67108864"
-$env:DFS_USER_PASSWORDS = '{"admin":"CAMBIAR_PASSWORD_ADMIN","ana":"CAMBIAR_PASSWORD_ANA"}'
-$env:DFS_USER_ROLES = '{"admin":"admin","ana":"usuario"}'
-$env:DFS_ADMIN_TOKEN = "token-administrador-secreto"
-python -m Gateway.app
-```
-
-`DFS_USERS` mantiene compatibilidad con tokens fijos. El flujo recomendado usa `DFS_USER_PASSWORDS`: el Gateway crea inicialmente `admin` (rol administrador) y `demo` (rol usuario), guarda las contraseñas con PBKDF2 y emite sesiones temporales. `configurar_entorno.ps1` genera contraseñas aleatorias y las muestra una sola vez. El archivo `metadata/usuarios.json` queda en el volumen del Gateway y no se sube a Git.
-
-Para usar sesiones desde la CLI:
-
-```powershell
-$env:DFS_GATEWAY_URL = "https://localhost:8443"
-$env:DFS_GATEWAY_TLS_CA = (Resolve-Path Deploy/certs/ca.crt).Path
-$env:DFS_DEFAULT_USER = "demo"
-& .\.venv\Scripts\python.exe -m Client.client login demo
-& .\.venv\Scripts\python.exe -m Client.client whoami
-& .\.venv\Scripts\python.exe -m Client.client create-user ana --rol usuario
-& .\.venv\Scripts\python.exe -m Client.client shell
-& .\.venv\Scripts\python.exe -m Client.client logout
-```
-
-Una persona nueva puede crear su propia cuenta mediante `POST /auth/register` o `python -m Client.client register <usuario>`; este registro siempre asigna el rol `usuario`. Solo una sesión con rol `admin` puede crear cuentas administrativas mediante `POST /auth/users`; los usuarios normales únicamente acceden a sus propios archivos. `POST /auth/login`, `POST /auth/logout` y `GET /auth/me` completan el ciclo de sesión.
-
-Los nodos escuchan solo en `127.0.0.1` por defecto. Las rutas de diagnóstico `/blocks` están desactivadas si no configuras `DFS_ADMIN_TOKEN` y requieren ese token aparte. `GET /health` no requiere autenticación y permite que Docker o un balanceador comprueben la disponibilidad del Gateway.
-
-En una escritura, el Gateway calcula los nodos responsables y llama a `ReplicarBloque` en uno de ellos. Ese nodo guarda su copia y envía el bloque directamente a los demás responsables mediante gRPC; el Gateway confirma la operación según el quórum W. La transferencia de réplicas es nodo-a-nodo, pero la selección de destinos, membresía y coordinación siguen a cargo del Gateway: esto no convierte el clúster en una DHT ni elimina el punto central de coordinación.
-
-Los nodos cifran los bloques en disco con AES-GCM y requieren `DFS_STORAGE_KEY`; usa una llave distinta por nodo y protégela con un gestor de secretos. Para la replicación directa entre nodos, cada nodo también necesita `DFS_NODE_TLS_CA`, `DFS_NODE_TLS_REQUIRED=1`, el nombre TLS esperado en `DFS_NODE_TLS_SERVER_NAME` y acceso de red a los demás nodos. Para red remota configura además `DFS_NODE_BIND=0.0.0.0`, `DFS_NODE_TLS_CERT` y `DFS_NODE_TLS_KEY` en cada nodo, `DFS_NODE_TLS_CA` y `DFS_NODE_TLS_REQUIRED=1` en el Gateway, y un `DFS_NODE_TOKEN` compartido. El límite gRPC `DFS_GRPC_MAX_MESSAGE_BYTES` predetermina 65 MiB y debe ser mayor que el tamaño máximo de bloque más el encabezado del protocolo. `DFS_NODE_PEER_TIMEOUT` predetermina 10 segundos por llamada de un nodo a su réplica y debe configurarse igual en Gateway y nodos. Se puede habilitar autenticación mutua TLS con `DFS_NODE_CLIENT_CA` en los nodos y certificados/llaves de cliente en cada Gateway y nodo que realice llamadas gRPC. Para exponer REST, configura `DFS_GATEWAY_BIND`, `DFS_GATEWAY_TLS_CERT`, `DFS_GATEWAY_TLS_KEY` y usuarios mediante `DFS_USER_PASSWORDS` o `DFS_USERS`; en el cliente define `DFS_GATEWAY_URL=https://...`.
-
-Para compatibilidad, la CLI aún admite un token individual configurado en `DFS_USER_TOKEN`; el flujo de sesión es el recomendado.
-
-```powershell
-$env:DFS_DEFAULT_USER = "ana"
-$env:DFS_USER_TOKEN = "token-largo-ana"
-python -m Client.client store .\archivo.pdf --usuario ana
-python -m Client.client list --usuario ana
-python -m Client.client get archivo.pdf --salida .\copia.pdf --usuario ana
-python -m Client.client delete archivo.pdf --usuario ana
-```
-
-El cliente guarda el token de sesión en `.dfsha_session.json` dentro del perfil del usuario. El Gateway deriva el propietario de ese token y no confía en el usuario enviado como parámetro. Para archivos grandes, ajusta `DFS_MAX_UPLOAD_BYTES`; el tamaño de bloque se controla con `DFS_BLOCK_SIZE` (64 MiB por defecto). El Gateway guarda el catálogo en `metadata/archivos.json`; conserva esa carpeta para mantener los metadatos entre reinicios.
-
-El factor de replicación se puede cambiar en ejecución mediante `PUT /cluster/replication`, pero esa operación exige `DFS_ADMIN_TOKEN`. El valor se guarda en `metadata/cluster.json` y se recupera al reiniciar el Gateway. El nuevo factor solo se confirma después de alcanzar el quórum de escritura; si hay nodos caídos, las limpiezas pendientes se reintentan durante los heartbeats.
-
-## API principal
-
-- `POST /files`: recibe el archivo como `multipart/form-data` en el campo `archivo` y el usuario en `usuario`.
-- `GET /files?usuario=...`: lista los archivos del usuario autenticado.
-- `GET /directories?path=...`: lista contenido del directorio virtual del usuario.
-- `POST /directories` con `{"path":"/docs"}` y `DELETE /directories?path=/docs`: crea o elimina directorios vacíos.
-- `GET /files/<file_id>?usuario=...`: reconstruye y entrega el archivo en streaming binario.
-- `DELETE /files/<file_id>?usuario=...`: elimina los bloques y los metadatos.
-- `GET /cluster`: informa nodos, estado de disponibilidad, N, R, W y el asignador activo (`java` en el despliegue).
-- `POST /cluster/rebalance`: registra un nodo, distribuye las réplicas según el anillo actualizado y reporta cualquier limpieza pendiente.
-- `DELETE /cluster/nodes/<direccion>`: salida controlada; migra los bloques antes de retirar el nodo.
-- `PUT /cluster/replication` con `{"factor": N}`: ajusta N y confirma primero las copias destino; reporta y reintenta la limpieza de excedentes si un nodo no está disponible.
-- `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`: ciclo de vida de sesiones.
-- `POST /auth/register` con `{"usuario":"...","password":"..."}`: registro público con rol fijo `usuario`.
-- `POST /auth/users` con `{"usuario":"...","password":"...","rol":"usuario|admin"}`: creación restringida a administradores.
-
-El CLI transmite el archivo local al Gateway con multipart, por lo que el cliente y el servidor pueden estar en equipos distintos. Ofrece `store`, `get`, `list`, `ls`, `mkdir`, `rmdir` y un `shell` interactivo con `cd`, `pwd` y `rm`. Todas las solicitudes HTTP usan `Authorization: Bearer ...` cuando se configura autenticación.
-
-## Despliegue público en AWS
-
-Para que usuarios externos accedan sin instalar certificados de laboratorio, usa un dominio propio, una IP elástica de EC2 y `Deploy/compose.aws.yaml`. Caddy publica HTTPS con un certificado público y mantiene el Gateway y los nodos dentro de la red privada de Docker.
-
-1. Crea una instancia EC2 con Amazon Linux 2023, una IP elástica y un dominio que apunte mediante un registro A a esa IP. En el Security Group permite TCP 80 y 443 para los usuarios; permite SSH 22 solamente desde la IP de administración.
-2. Conéctate por SSH, instala Docker, Git y Python, clona el repositorio e instala dependencias de Python.
-3. En `Deploy/.env` configura los secretos de nodos y usuarios, además de `DFS_PUBLIC_HOST=dfs.tudominio.com`. No uses certificados de `Deploy/certs` para este modo.
-4. Inicia la plataforma con:
-
-```bash
-docker compose --env-file Deploy/.env -f Deploy/compose.yaml -f Deploy/compose.aws.yaml up --build -d
-```
-
-5. Los clientes usan `DFS_GATEWAY_URL=https://dfs.tudominio.com`, inician sesión con `python -m Client.client login <usuario>` y no necesitan definir `DFS_GATEWAY_TLS_CA`.
-
-El primer inicio requiere que el dominio ya resuelva a la IP de EC2 y que los puertos 80 y 443 estén abiertos, para que Caddy obtenga el certificado. El Gateway no se publica directamente en AWS.
-
-## Estado y límites del prototipo
-
-El clúster exige W mayoritario y R + W > N para asegurar intersección entre quórums. Una lectura solo acepta contenido que alcance R; si hay réplicas divergentes sin un valor con quórum, falla de forma segura en vez de escoger una copia arbitraria. Al agregar un nodo, valida las copias destino antes de limpiar las réplicas fuera del anillo. El metadato del archivo solo se publica después de completar todos sus bloques, y cada escritura de bloque usa reemplazo atómico para que una lectura no vea un archivo parcialmente escrito.
-
-El servicio Java calcula los responsables de cada bloque mediante hashing consistente. Cada nodo Java mantiene una vista local de membresía, consulta por gRPC el heartbeat de sus pares cada cinco segundos y difunde directamente la vista cuando detecta una incorporación o caída. El Gateway conserva el catálogo y coordina la solicitud del cliente, mientras el nodo coordinador transfiere las réplicas a los demás nodos. Para despliegues remotos, activa TLS en gRPC y HTTPS en REST con certificados confiables.
-
-Siguen pendientes la tolerancia a la caída del propio Gateway y la replicación del catálogo: esta versión usa coordinación central y un catálogo JSON local. Tampoco implementa acceso aleatorio con `open/read/write/lock` ni un montaje transparente como sistema de archivos del sistema operativo; ofrece transferencia de archivos y gestión de directorios por CLI/API.
-
-La guía específica del Hito 3 no estaba entre los archivos disponibles. Las operaciones de salida/rebalanceo, cambio dinámico de N y concurrencia descritas aquí se implementaron con base en la arquitectura y especificaciones compartidas por el equipo.
+Limitaciones conocidas
+DFSha es un prototipo con coordinación central en el Gateway y catálogo
+de metadatos local al Gateway. La replicación de bloques no elimina el
+punto central de coordinación ni proporciona por sí sola tolerancia a la
+caída del Gateway. El sistema ofrece operaciones de transferencia y
+gestión de directorios por CLI/API; no equivale a un sistema de archivos
+montado de forma transparente en el sistema operativo.
