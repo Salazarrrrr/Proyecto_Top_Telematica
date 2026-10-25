@@ -1,173 +1,312 @@
-DFSha
-DFSha es un prototipo de sistema de archivos distribuido. Permite
-autenticarse desde una CLI, crear directorios virtuales, subir archivos,
-consultar el catálogo y recuperar archivos mediante un Gateway
-REST/HTTPS y un clúster de almacenamiento distribuido con gRPC.
-Esta documentación describe el proyecto y el flujo de demostración
-utilizado. Los nombres de archivos, comandos y rutas deben coincidir
-con la versión desplegada en el repositorio.
 
-Arquitectura
-- Client: CLI de Python para autenticación, navegación de
-  directorios y transferencia de archivos.
-- Gateway: API REST basada en Flask. Autentica usuarios, aplica
-  permisos, mantiene el catálogo de metadatos y coordina lecturas y
-  escrituras.
-- Cluster Java: nodos de almacenamiento que se comunican mediante
-  gRPC, intercambian heartbeats y replican bloques entre pares.
-- Proto: contrato compartido para las operaciones gRPC.
-- Deploy: archivos de configuración y despliegue de contenedores.
-El Gateway coordina las operaciones del cliente. Los bloques se
-distribuyen entre los nodos responsables y las lecturas/escrituras
-aplican quórums configurados. El catálogo de archivos y directorios se
-conserva en el almacenamiento de metadatos del Gateway.
-Requisitos
-- Python y las dependencias de requirements.txt.
-- Un entorno virtual Python.
-- Docker y Docker Compose para ejecutar el despliegue en contenedores.
-- Acceso de red al Gateway.
-- Para el despliegue de laboratorio con TLS propio, el certificado CA
-  correspondiente.
-- Para el despliegue en AWS, las credenciales de usuario de DFSha y la
-  URL HTTPS del Gateway.
-Instala las dependencias desde la raíz del repositorio:
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-Configurar el cliente
-Despliegue AWS
-Configura la URL pública HTTPS del Gateway y, si el despliegue utiliza
-el certificado del laboratorio, la ruta al certificado CA
-correspondiente. En el entorno utilizado para la demostración:
+# DFSha: Sistema de Archivos Distribuido
+
+## 1. Descripción del proyecto
+
+DFSha es un sistema de archivos distribuido que permite almacenar, consultar, recuperar y administrar archivos mediante una arquitectura cliente-servidor distribuida.
+
+El sistema utiliza un Gateway como punto de entrada para los clientes y un clúster de nodos de almacenamiento que se comunican mediante gRPC. Los archivos se gestionan a través de una interfaz de comandos y los usuarios deben autenticarse para acceder a sus recursos.
+
+El proyecto implementa mecanismos de distribución de archivos, comunicación entre componentes, persistencia de metadatos y control de acceso por usuario.
+
+## 2. Arquitectura del sistema
+
+La arquitectura está compuesta por los siguientes elementos:
+
+- Cliente: permite registrar usuarios, iniciar sesión y ejecutar operaciones sobre los archivos y directorios.
+- Gateway: recibe las solicitudes de los clientes, gestiona las operaciones y coordina la comunicación con los nodos de almacenamiento.
+- Clúster de almacenamiento: está compuesto por tres nodos Java que reciben y procesan las solicitudes de almacenamiento y recuperación mediante gRPC.
+- Metadatos: permiten identificar los archivos almacenados y gestionar su información, ubicación y propietario.
+- Seguridad: contempla autenticación de usuarios, validación de acceso a los archivos y comunicación HTTPS entre el cliente y el Gateway.
+
+### Flujo general
+
+```
+              CLIENTE
+                 |
+                 | HTTPS
+                 v
+              GATEWAY
+                 |
+                 | gRPC
+        +--------+--------+
+        |        |        |
+        v        v        v
+     NODO 1   NODO 2   NODO 3
+     Java     Java     Java
+        |        |        |
+        +--------+--------+
+                 |
+          Almacenamiento
+          distribuido
+```
+
+El cliente se comunica con el Gateway mediante HTTPS. El Gateway coordina las operaciones con los nodos de almacenamiento a través de gRPC.
+
+## 3. Tecnologías utilizadas
+
+- Python: implementación del cliente y del Gateway.
+- Java: implementación de los nodos de almacenamiento.
+- gRPC: comunicación entre el Gateway y los nodos.
+- HTTPS/TLS: protección de la comunicación entre el cliente y el Gateway.
+- Docker y Docker Compose: construcción y ejecución de los servicios.
+- Amazon EC2: infraestructura utilizada para el despliegue en AWS.
+- AWS VPC: red que permite la comunicación entre la instancia pública del Gateway y los nodos privados.
+
+## 4. Requisitos previos
+
+Para ejecutar el proyecto localmente se requiere:
+
+- Python instalado.
+- Java y las herramientas de compilación requeridas por el proyecto.
+- Docker y Docker Compose.
+- Git, si se desea clonar el repositorio.
+- Certificados TLS y variables de entorno configurados según el entorno de ejecución.
+
+Para utilizar el despliegue en AWS también se necesita acceso a la instancia del Gateway y conectividad con los nodos privados.
+
+## 5. Estructura del proyecto
+
+La estructura principal del proyecto se organiza en los siguientes componentes:
+
+```
+Proyecto_Top_Telematica/
+├── Client/
+│   └── client.py
+├── Gateway/
+│   ├── app.py
+│   └── cluster_comunication/
+│       └── cluster_core.py
+├── Deploy/
+│   ├── compose.yaml
+│   ├── compose.gateway.aws.yaml
+│   └── certs/
+├── README.md
+└── ...
+```
+
+La estructura anterior representa los componentes principales. Pueden existir otros archivos y directorios relacionados con los nodos Java, los servicios, los modelos de datos, las pruebas y la configuración.
+
+## 6. Configuración del cliente
+
+Antes de utilizar el cliente, es necesario configurar la dirección del Gateway y el certificado de la autoridad certificadora.
+
+En PowerShell, desde el directorio del proyecto, se pueden definir las variables de entorno de la siguiente manera:
+
+```
 $env:DFS_GATEWAY_URL = "https://52.71.140.30:8443"
 $env:DFS_GATEWAY_TLS_CA = "C:\Users\aceve\Desktop\Telematica_proyecto\Proyecto_Top_Telematica\Deploy\certs\ca.crt"
-La IP y las rutas anteriores son específicas del entorno de
-demostración. Si cambia la IP, el dominio, el equipo o el certificado,
-actualiza estos valores. No publiques claves privadas, tokens ni
-archivos de secretos.
-Ejecución del cliente
-Desde la raíz del repositorio, con el entorno virtual activado:
-python -m Client.client
-Para ejecutar un subcomando directamente, utiliza
-python -m Client.client <comando>.
-Registro, inicio de sesión y shell
-Registra un usuario normal:
-python -m Client.client register <usuario>
-La CLI solicitará la contraseña y su confirmación. El registro público
-asigna el rol de usuario normal.
+```
 
-Inicia sesión explícitamente con esa cuenta:
-python -m Client.client login <usuario>
-Después, abre el shell interactivo:
+Importante: la dirección IP y la ruta del certificado corresponden a un entorno específico de despliegue. Deben reemplazarse si cambian la infraestructura, el certificado o la ubicación del proyecto.
+
+Para ejecutar los comandos de Python se recomienda activar el entorno virtual del proyecto, si está configurado:
+
+```
+.\.venv\Scripts\Activate.ps1
+```
+
+## 7. Registro e inicio de sesión
+
+El sistema permite registrar usuarios e iniciar sesión desde el cliente.
+
+### Registrar un usuario
+
+```
+python -m Client.client register Sustentacion
+```
+
+El programa solicitará una contraseña y su confirmación. Si el registro es exitoso, mostrará un mensaje de confirmación.
+
+### Iniciar sesión
+
+```
+python -m Client.client login Sustentacion
+```
+
+Después de iniciar sesión, el usuario podrá abrir la interfaz de comandos.
+
+Nota: se debe iniciar sesión con el usuario correspondiente antes de realizar operaciones. La autenticación permite asociar las operaciones al usuario que está utilizando el sistema.
+
+## 8. Interfaz de comandos
+
+Para abrir la interfaz interactiva se ejecuta:
+
+```
 python -m Client.client shell
-Dentro del shell puedes comprobar la identidad y el espacio remoto con
-los comandos disponibles. Para cerrar el shell, ejecuta exit.
+```
 
-Importante: registra la cuenta y luego inicia sesión con esa misma
-cuenta antes de realizar la demostración. No asumas que registrar un
-usuario inicia automáticamente una sesión autenticada.
-Comandos del shell
-  Comando                             Función
-  help                              Muestra los comandos disponibles.
+Desde la interfaz se pueden realizar operaciones sobre directorios y archivos.
 
-  pwd                               Muestra la ruta remota actual.
+### Comandos principales
 
-  ls [ruta]                         Lista directorios y archivos de una
-                                      ruta.
+| Comando                      | Descripción                                                  |
+| ---------------------------- | ------------------------------------------------------------ |
+| `mkdir <directorio>`         | Crea un directorio.                                          |
+| `cd <directorio>`            | Cambia al directorio indicado.                               |
+| `pwd`                        | Muestra la ruta del directorio actual.                       |
+| `list`                       | Lista los elementos disponibles en el directorio actual.     |
+| `store <ruta_archivo>`       | Almacena un archivo en el sistema distribuido.               |
+| `get <nombre_o_id> [salida]` | Recupera un archivo y permite especificar su ruta de salida. |
+| `exit`                       | Finaliza la interfaz interactiva.                            |
 
-  list                              Lista archivos del directorio
-                                      actual.
+La sintaxis exacta de los comandos depende de la implementación disponible en el cliente.
 
-  cd <ruta>                         Cambia el directorio remoto actual.
+## 9. Ejemplo de uso
 
-  mkdir <ruta>                      Crea un directorio remoto.
+A continuación, se presenta un flujo de prueba para demostrar las funcionalidades principales del sistema.
 
-  rmdir <ruta>                      Elimina un directorio remoto vacío.
+### Paso 1. Crear un directorio
 
-  store <archivo_local>             Sube un archivo local al directorio
-                                      remoto actual.
+Dentro de la interfaz interactiva:
 
-  get <nombre_o_id> [salida]        Descarga un archivo a la ruta local
-                                      indicada.
+```
+mkdir demostracion
+```
 
-  rm <nombre_o_id>                  Elimina un archivo.
-  exit                              Cierra el shell.
-Las rutas locales de Windows deben escribirse entre comillas si
-contienen espacios.
-Flujo de demostración: subir y descargar un archivo
-Este ejemplo utiliza el video Parte1.mp4. Asegúrate de que exista en
-la ruta local indicada.
-1. Configura el cliente y autentícate:
-   $env:DFS_GATEWAY_URL = "https://52.71.140.30:8443"
-   $env:DFS_GATEWAY_TLS_CA = "C:\Users\aceve\Desktop\Telematica_proyecto\Proyecto_Top_Telematica\Deploy\certs\ca.crt"
-   python -m Client.client login Sustentacion
-   python -m Client.client shell
-2. En el shell de DFSha, crea y abre un directorio:
-   mkdir demostracion
-   cd demostracion
-   pwd
-3. Sube el archivo:
-   store "C:\Users\aceve\Desktop\Sustentacion Telematica\Parte1.mp4"
-   La respuesta de éxito incluye file_id, el nombre del archivo y el
-   número de bloques. Guarda el file_id devuelto por esa operación;
-   cada subida puede generar un identificador distinto.
-4. Comprueba el catálogo del directorio:
-   list
-5. Descarga el archivo utilizando el identificador real devuelto por
-   store:
-   get <file_id> "C:\Users\aceve\Desktop\Sustentacion Telematica\recuperado_Parte1.mp4"
-6. Comprueba que el archivo recuperado exista y pueda reproducirse.
-   Después, cierra el shell:
-   exit
-El comando get utiliza la sintaxis get <nombre_o_id> [salida]; no es
-necesario agregar --salida dentro del shell interactivo.
-Seguridad y aislamiento de usuarios
-- Cada solicitud autenticada debe utilizar el token de la sesión
-  correspondiente.
-- Después de register, ejecuta login con el usuario registrado
-  antes de abrir el shell.
-- Los usuarios normales deben acceder únicamente a sus propios
-  archivos y directorios.
-- No compartas contraseñas, tokens de sesión, gateway.env,
-  Deploy/.env, llaves privadas ni secretos.
-- Conserva el volumen y los archivos de metadatos del Gateway. Los
-  metadatos identifican el propietario de cada archivo y permiten
-  mantener el catálogo entre reinicios.
-- Los nodos de almacenamiento no deben exponerse públicamente sin las
-  reglas de red y la protección TLS previstas por el despliegue.
-Despliegue
-Los comandos de despliegue dependen del archivo Compose y del archivo de
-entorno utilizados en cada entorno. Antes de ejecutar
-docker compose up, confirma que la ruta del archivo de entorno exista
-y que el archivo Compose corresponda al despliegue elegido.
+### Paso 2. Acceder al directorio
 
-Para el entorno AWS utilizado en esta demostración, se ha empleado el
-archivo Compose del Gateway:
+```
+cd demostracion
+```
 
-sudo docker compose --env-file /home/ec2-user/gateway.env \
-  -f Deploy/compose.gateway.aws.yaml up -d --build gateway
-El archivo de entorno de AWS está fuera del repositorio en ese entorno.
+### Paso 3. Verificar la ubicación actual
 
-No lo crees de nuevo ni lo reemplaces por un archivo vacío: contiene
-configuración sensible y necesaria para el servicio.
+```
+pwd
+```
 
-Para revisar el estado de los contenedores:
-sudo docker ps
-Para revisar los registros del Gateway:
-sudo docker logs --since 10m deploy-gateway-1
-Los nombres de los contenedores y las rutas anteriores corresponden al
-despliegue de referencia y pueden variar en otro entorno.
-Pruebas automáticas
+### Paso 4. Almacenar un archivo
 
-Desde la raíz del repositorio, ejecuta las pruebas disponibles:
-.\.venv\Scripts\python.exe -m unittest discover -s Tests/Gateway -p "test_*.py" -v
-.\.venv\Scripts\python.exe -m unittest discover -s Tests/Client -p "test_*.py" -v
-.\.venv\Scripts\python.exe -m unittest discover -s Tests/Node -p "test_*.py" -v
+Se puede almacenar un archivo de prueba indicando su ruta completa:
 
-Limitaciones conocidas
-DFSha es un prototipo con coordinación central en el Gateway y catálogo
-de metadatos local al Gateway. La replicación de bloques no elimina el
-punto central de coordinación ni proporciona por sí sola tolerancia a la
-caída del Gateway. El sistema ofrece operaciones de transferencia y
-gestión de directorios por CLI/API; no equivale a un sistema de archivos
-montado de forma transparente en el sistema operativo.
+```
+store "C:\Users\aceve\Desktop\Sustentacion Telematica\Parte1.mp4"
+```
+
+Si la operación se completa correctamente, el sistema devuelve un identificador del archivo. Este identificador debe conservarse para realizar operaciones posteriores.
+
+### Paso 5. Consultar los archivos
+
+```
+list
+```
+
+Este comando permite verificar los elementos disponibles en el directorio actual.
+
+### Paso 6. Recuperar un archivo
+
+Para recuperar el archivo, se utiliza el identificador obtenido durante el almacenamiento:
+
+```
+get <ID_DEL_ARCHIVO> "C:\Users\aceve\Desktop\Sustentacion Telematica\recuperado_Parte1.mp4"
+```
+
+Se debe reemplazar `<ID_DEL_ARCHIVO>` por el identificador real generado por el sistema, sin escribir los símbolos `<` y `>`.
+
+### Paso 7. Finalizar la sesión interactiva
+
+```
+exit
+```
+
+Este flujo permite comprobar el registro, la autenticación, la creación de directorios, el almacenamiento, la consulta y la recuperación de archivos.
+
+## 10. Despliegue en AWS
+
+El proyecto cuenta con una configuración de despliegue en AWS mediante instancias EC2 y Docker Compose.
+
+La arquitectura desplegada utiliza:
+
+- Una instancia pública para ejecutar el Gateway.
+- Tres instancias privadas para los nodos de almacenamiento.
+- Una VPC para organizar la red.
+- Un grupo de seguridad para controlar el tráfico permitido.
+- HTTPS para el acceso de los clientes.
+- gRPC para la comunicación entre el Gateway y los nodos.
+
+### Configuración del Gateway
+
+En el entorno desplegado, el archivo de variables de entorno se encuentra en:
+
+```
+/home/ec2-user/gateway.env
+```
+
+Desde el directorio raíz del proyecto en la instancia del Gateway, se puede reconstruir y levantar el servicio con:
+
+```
+sudo docker compose --env-file /home/ec2-user/gateway.env -f Deploy/compose.gateway.aws.yaml up -d --build --force-recreate gateway
+```
+
+Para consultar el estado de los contenedores:
+
+```
+sudo docker compose --env-file /home/ec2-user/gateway.env -f Deploy/compose.gateway.aws.yaml ps
+```
+
+Para consultar los registros del Gateway:
+
+```
+sudo docker logs deploy-gateway-1
+```
+
+Estos comandos corresponden a la configuración de despliegue utilizada en el proyecto. Si se modifican los nombres de los servicios o contenedores, deben ajustarse los comandos.
+
+### Seguridad de la red
+
+La instancia del Gateway funciona como punto de entrada público. Los nodos de almacenamiento se encuentran en subredes privadas y deben permitir el tráfico gRPC únicamente desde el grupo de seguridad autorizado del Gateway.
+
+No se recomienda exponer directamente los puertos de los nodos de almacenamiento a Internet.
+
+## 11. Seguridad y control de acceso
+
+El sistema contempla los siguientes mecanismos:
+
+- Registro e inicio de sesión de usuarios.
+- Identificación del propietario de los archivos mediante metadatos.
+- Validación de permisos al acceder a los archivos.
+- Comunicación HTTPS entre el cliente y el Gateway.
+- Comunicación gRPC entre el Gateway y los nodos.
+- Restricción del acceso de red a los nodos privados mediante grupos de seguridad de AWS.
+
+Las credenciales y los certificados deben manejarse de forma segura. Los archivos de configuración que contengan secretos no deben publicarse en repositorios públicos.
+
+## 12. Pruebas funcionales
+
+Para validar el funcionamiento del sistema se recomienda realizar las siguientes pruebas:
+
+1. Registrar un usuario nuevo.
+2. Iniciar sesión con el usuario registrado.
+3. Crear un directorio.
+4. Almacenar un archivo de prueba.
+5. Consultar el listado de archivos.
+6. Recuperar el archivo mediante su identificador.
+7. Comprobar que el archivo recuperado se pueda abrir y que su contenido coincida con el original.
+8. Verificar que un usuario no pueda acceder a archivos pertenecientes a otro usuario.
+9. Comprobar la comunicación entre el Gateway y los nodos de almacenamiento.
+10. Revisar los registros de los servicios cuando se presenten errores.
+
+Las pruebas deben ejecutarse en el entorno correspondiente, ya sea local o desplegado en AWS.
+
+## 13. Limitaciones y consideraciones
+
+El comportamiento del sistema depende de la disponibilidad del Gateway, de los nodos y de la conectividad entre los componentes.
+
+En particular:
+
+- Si el Gateway no puede comunicarse con los nodos necesarios, algunas operaciones de almacenamiento o recuperación pueden fallar.
+- La recuperación de archivos requiere utilizar un identificador válido o un nombre reconocido por el sistema.
+- La configuración de certificados y variables de entorno debe coincidir con el entorno utilizado.
+- Las pruebas de disponibilidad y consistencia deben realizarse para verificar el comportamiento ante la caída de uno o más nodos.
+- Las características de replicación, tolerancia a fallos y recuperación automática deben evaluarse de acuerdo con la implementación efectiva del proyecto.
+
+## 14. Autores
+
+Proyecto desarrollado como parte de la asignatura de Telemática.
+
+Proyecto: DFSha, sistema de archivos distribuido.
+Emilton Mena Acevedo 
+Mariana Hincapie Henao
+Estaban Zalasar 
+
